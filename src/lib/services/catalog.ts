@@ -25,6 +25,7 @@ export interface CatalogProduct {
   base_price: number;
   emoji: string;
   available: boolean;
+  archived: boolean;
   variants: Variant[];
   addons: Addon[];
   recipe: { ingredient_id: number; qty: number; scales: boolean }[];
@@ -117,7 +118,7 @@ export async function getMenu(q: Queryable) {
     q.query<{ id: number; name: string }>("select id, name from ingredients"),
   ]);
   const ingName = new Map(ingredients.map((i) => [i.id, i.name]));
-  const products: MenuProduct[] = catalog.map(({ recipe, addons, ...p }) => {
+  const products: MenuProduct[] = catalog.filter((p) => !p.archived).map(({ recipe, addons, ...p }) => {
     // Sellable if at least the smallest size can still be made.
     const minMult = p.variants.length ? Math.min(...p.variants.map((v) => v.recipe_multiplier)) : 1;
     const smallest = p.variants.find((v) => v.recipe_multiplier === minMult);

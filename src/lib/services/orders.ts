@@ -117,7 +117,7 @@ export async function createOrder(db: Db, actor: Actor, input: CreateOrderInput)
     const usage = new Map<number, number>();
     const lines = input.items.map((it) => {
       const p = catalog.get(it.productId);
-      if (!p || !p.available) throw new AppError(`${p?.name ?? "That item"} is not available.`);
+      if (!p || !p.available || p.archived) throw new AppError(`${p?.name ?? "That item"} is not available.`);
       let variant = p.variants.find((v) => v.id === it.variantId);
       if (it.variantId && !variant) throw new AppError(`Invalid size for ${p.name}.`);
       if (!variant && p.variants.length) variant = p.variants.find((v) => v.is_default) ?? p.variants[0];

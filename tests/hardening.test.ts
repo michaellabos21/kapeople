@@ -26,6 +26,7 @@ describe("migrations", () => {
       "002_promo_limits_and_rate_events.sql",
       "003_customer_notes.sql",
       "004_push_subscriptions.sql",
+      "005_product_archive.sql",
     ]);
     await migrate(db, false);
     expect(await names()).toEqual(first); // nothing re-applied

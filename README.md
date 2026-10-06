@@ -47,7 +47,7 @@ orders, collect-payment-on-pickup, cancel, refund, transaction history, ingredie
 waste, recount, low-stock flags, movement log), reports (today / week / month: sales, orders, average order,
 payment breakdown, best sellers, low stock), offline banner.
 
-**Admin** — everything in Reports plus customer and loyalty stats, menu on/off + price editing, a **Customers** database (search, sort, spend/orders/points per customer, order and points history, internal notes, manual points adjustments with an audit trail, block/restore, CSV export), and **staff & admin account management** (add accounts, deactivate/reactivate, reset passwords with a one-time generated password). Everyone can change their own password.
+**Admin** — everything in Reports plus customer and loyalty stats, a **Menu manager** (add/edit products with sizes, add-ons and an ingredient recipe, categories, hide/restore; admin only), a **Customers** database (search, sort, spend/orders/points per customer, order and points history, internal notes, manual points adjustments with an audit trail, block/restore, CSV export), and **staff & admin account management** (add accounts, deactivate/reactivate, reset passwords with a one-time generated password). Everyone can change their own password.
 
 **Security** — passwords are scrypt-hashed; sign-in locks for 15 minutes after 5 failed attempts per email (an admin password reset lifts it); deactivated accounts are signed out immediately; versioned migrations in `db/migrations/` upgrade existing databases on start (each runs once; nothing pending = one read-only query). Failed logins are limited to 20 per 15 minutes per IP and 5 per email; sign-ups are not rate limited; guessing the mobile number of an imported account to 5 tries per email per network (50/hour per email overall); unknown-email and wrong-password logins take the same time.
 
@@ -103,7 +103,7 @@ the installed app, other browsers, or twice. To preview it anywhere, open `/app/
 ## Tests
 
 ```bash
-npm test          # 86 tests against a real in-memory Postgres
+npm test          # 95 tests against a real in-memory Postgres
 npm run typecheck
 ```
 
@@ -158,7 +158,7 @@ until that is added.
   deployment needs a shared channel (Postgres `LISTEN/NOTIFY` or Supabase Realtime) in `src/lib/bus.ts`.
 - **POS offline mode:** the POS shows a connection-lost banner but doesn't queue sales offline yet.
 - Single branch only; the schema has `branches` for later. Delivery, gift cards, tiers, recommendations: not built.
-- Product/add-on/recipe editing is limited to price and on/off in the admin; the rest is changed via `db/seed.sql`.
+- Menu items use an emoji as their picture (no photo upload yet), and products can't be reordered within a category.
 
 ## Layout
 

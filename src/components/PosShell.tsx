@@ -85,6 +85,7 @@ function Inner({ name, role, children }: { name: string; role: string; children:
             <span className={`h-2 w-2 rounded-full ${disconnected ? "bg-bad" : "bg-ok"}`} />
             {disconnected ? "Offline" : "Live"}
           </span>
+          {role === "admin" && <Link href="/admin/menu" className="font-semibold text-brand">Menu</Link>}
           {role === "admin" && <Link href="/admin" className="font-semibold text-brand">Admin</Link>}
           <span className="text-muted">{name}</span>
           <button className="font-semibold text-muted hover:text-ink" onClick={() => setAlertsOpen(true)}>Alerts</button>
