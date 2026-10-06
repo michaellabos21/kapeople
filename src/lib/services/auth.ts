@@ -52,26 +52,16 @@ export function samePhone(a?: string | null, b?: string | null): boolean {
   return tail(a).length === 10 && tail(a) === tail(b);
 }
 
-/**
- * Sign-up is throttled generously: 100 per hour per network (shared Wi-Fi / carrier NAT is common) and 60 per
- * minute across the whole site, which stops mass account creation and bulk email probing without hurting real use.
- */
-const SIGNUP_PER_IP_PER_HOUR = 100;
-const SIGNUP_GLOBAL_PER_MINUTE = 60;
-
 const EMAIL_TAKEN_MESSAGE =
   "An account with this email already exists. If you signed up with us earlier, enter the same mobile number you used then.";
 
 export async function signup(
   q: Queryable,
   input: { name: string; email: string; password: string; phone?: string },
+  /** Only used to throttle guessing an imported account's mobile number; sign-up itself is not rate limited. */
   ip?: string | null,
 ) {
-  await assertUnderLimit(q, "signup", ip, SIGNUP_PER_IP_PER_HOUR, 60, "Too many sign-ups from this network. Please try again in a little while.");
-  await assertUnderLimit(q, "signup-global", "all", SIGNUP_GLOBAL_PER_MINUTE, 1, "We're getting a lot of sign-ups right now. Please try again in a minute.");
-  await recordEvent(q, "signup", ip);
-  await recordEvent(q, "signup-global", "all");
-
+  // Deliberately no sign-up rate limit (many real customers share one network address).
   const email = input.email.trim().toLowerCase();
   const [dupe] = await q.query<Row>("select id, role, phone, password_hash from users where email = $1", [email]);
   if (dupe) {

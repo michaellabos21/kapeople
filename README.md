@@ -49,7 +49,7 @@ payment breakdown, best sellers, low stock), offline banner.
 
 **Admin** — everything in Reports plus customer and loyalty stats, menu on/off + price editing, a **Customers** database (search, sort, spend/orders/points per customer, order and points history, internal notes, manual points adjustments with an audit trail, block/restore, CSV export), and **staff & admin account management** (add accounts, deactivate/reactivate, reset passwords with a one-time generated password). Everyone can change their own password.
 
-**Security** — passwords are scrypt-hashed; sign-in locks for 15 minutes after 5 failed attempts per email (an admin password reset lifts it); deactivated accounts are signed out immediately; versioned migrations in `db/migrations/` upgrade existing databases on start (each runs once; nothing pending = one read-only query). Failed logins are limited to 20 per 15 minutes per IP and 5 per email; sign-ups to 100/hour per network and 60/minute site-wide; guessing the mobile number of an imported account to 5 tries per email per network (50/hour per email overall); unknown-email and wrong-password logins take the same time.
+**Security** — passwords are scrypt-hashed; sign-in locks for 15 minutes after 5 failed attempts per email (an admin password reset lifts it); deactivated accounts are signed out immediately; versioned migrations in `db/migrations/` upgrade existing databases on start (each runs once; nothing pending = one read-only query). Failed logins are limited to 20 per 15 minutes per IP and 5 per email; sign-ups are not rate limited; guessing the mobile number of an imported account to 5 tries per email per network (50/hour per email overall); unknown-email and wrong-password logins take the same time.
 
 ## Push notifications
 

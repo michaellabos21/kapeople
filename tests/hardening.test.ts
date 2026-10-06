@@ -88,21 +88,16 @@ describe("promo limits", () => {
 });
 
 describe("throttling and enumeration", () => {
-  const newcomer = (n: number | string, ip?: string | null) =>
-    signup(db, { name: "N", email: `n${n}@example.test`, password: "longenough-password" }, ip);
-
-  it("allows 100 sign-ups per hour from one network (shared Wi-Fi) and then slows that network down", async () => {
-    await db.query("insert into rate_events (bucket, key) select 'signup', '7.7.7.7' from generate_series(1, 99)");
-    await expect(newcomer(1, "7.7.7.7")).resolves.toBeTruthy(); // the 100th
-    await expect(newcomer(2, "7.7.7.7")).rejects.toMatchObject({ status: 429 });
-    await expect(newcomer(3, "8.8.4.4")).resolves.toBeTruthy(); // other networks unaffected
-    await expect(newcomer(4, null)).resolves.toBeTruthy(); // unknown IP: only the global cap applies
-  });
-
-  it("caps sign-ups site-wide at 60 per minute", async () => {
-    await db.query("insert into rate_events (bucket, key) select 'signup-global', 'all' from generate_series(1, 59)");
-    await expect(newcomer(1, "1.1.1.1")).resolves.toBeTruthy();
-    await expect(newcomer(2, "2.2.2.2")).rejects.toMatchObject({ status: 429, message: expect.stringMatching(/lot of sign-ups/) });
+  it("does not limit sign-ups, from one network or overall", async () => {
+    // Even with a large amount of recent sign-up activity on record, new customers are never turned away.
+    await db.query("insert into rate_events (bucket, key) select 'signup', '7.7.7.7' from generate_series(1, 500)");
+    await db.query("insert into rate_events (bucket, key) select 'signup-global', 'all' from generate_series(1, 500)");
+    for (let i = 0; i < 15; i++) {
+      await expect(signup(db, { name: "N", email: `n${i}@example.test`, password: "longenough-password" }, "7.7.7.7")).resolves.toBeTruthy();
+    }
+    await expect(signup(db, { name: "N", email: "late@example.test", password: "longenough-password" }, null)).resolves.toBeTruthy();
+    const [{ n }] = await db.query("select count(*)::int as n from rate_events where bucket in ('signup','signup-global')");
+    expect(n).toBe(1000); // sign-ups no longer write rate-limit rows at all
   });
 
   it("throttles guessing the mobile number of an imported account, without letting a stranger lock the owner out", async () => {
