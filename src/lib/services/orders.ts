@@ -102,10 +102,10 @@ export async function createOrder(db: Db, actor: Actor, input: CreateOrderInput)
   const result = await db.tx(async (q) => {
     await lock(q); // serialises order creation so stock checks can't race
 
-    if (input.idempotencyKey) {
-      const [dupe] = await q.query<{ id: number }>("select id from orders where idempotency_key = $1", [
-        input.idempotencyKey,
-      ]);
+    // Keys are scoped to the caller, so one user can never collide with (or read) another user's order.
+    const idemKey = input.idempotencyKey ? `${actor.id}:${input.idempotencyKey}` : null;
+    if (idemKey) {
+      const [dupe] = await q.query<{ id: number }>("select id from orders where idempotency_key = $1", [idemKey]);
       if (dupe) return { id: dupe.id, duplicate: true, customerId: null as number | null };
     }
 
@@ -143,6 +143,7 @@ export async function createOrder(db: Db, actor: Actor, input: CreateOrderInput)
     // 3. Discounts: manual (staff) wins over a promo code; reward stacks on top.
     let discount = 0;
     let discountLabel: string | null = null;
+    let promoCode: string | null = null;
     if (input.manualDiscount && input.manualDiscount.value > 0) {
       const m = input.manualDiscount;
       discount = m.kind === "percent" ? subtotal * (Math.min(m.value, 100) / 100) : m.value;
@@ -153,8 +154,19 @@ export async function createOrder(db: Db, actor: Actor, input: CreateOrderInput)
       ]);
       if (!promo) throw new AppError("That promo code isn't valid.");
       if (subtotal < promo.min_spend) throw new AppError(`This promo needs a minimum spend of ₱${promo.min_spend}.`);
+      if (promo.max_uses_per_customer != null) {
+        const promoCustomer = staff ? (input.customerId ?? null) : actor.id;
+        if (!promoCustomer) throw new AppError("This promo is limited per customer — attach a customer account first.");
+        const [{ n }] = await q.query<{ n: number }>(
+          `select count(*)::int as n from orders
+            where customer_id = $1 and promo_code = $2 and status not in ('cancelled','refunded')`,
+          [promoCustomer, promo.code],
+        );
+        if (n >= promo.max_uses_per_customer) throw new AppError(`You've already used ${promo.code}.`, 409, "promo_used");
+      }
       discount = promo.kind === "percent" ? subtotal * (promo.value / 100) : promo.value;
       discountLabel = `${promo.code}`;
+      promoCode = promo.code;
     }
     discount = r2(Math.min(discount, subtotal));
 
@@ -187,13 +199,13 @@ export async function createOrder(db: Db, actor: Actor, input: CreateOrderInput)
     const [order] = await q.query<{ id: number; order_number: number }>(
       `insert into orders (order_number, branch_id, customer_id, created_by, source, status, payment_method, payment_status,
           subtotal, discount, discount_label, reward_discount, total, points_redeemed, ingredient_usage, notes,
-          idempotency_key, accepted_at)
-       values ((select coalesce(max(order_number), 1000) + 1 from orders), 1,$1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13::jsonb,$14,$15, $16)
+          idempotency_key, accepted_at, promo_code)
+       values ((select coalesce(max(order_number), 1000) + 1 from orders), 1,$1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13::jsonb,$14,$15, $16, $17)
        returning id, order_number`,
       [
         customerId, actor.id, staff ? "pos" : "app", status, input.paymentMethod, paidNow ? "paid" : "unpaid",
         subtotal, discount, discountLabel, rewardDiscount, total, pointsRedeemed, JSON.stringify(usageObj),
-        input.notes?.trim() || null, input.idempotencyKey ?? null, staff ? new Date().toISOString() : null,
+        input.notes?.trim() || null, idemKey, staff ? new Date().toISOString() : null, promoCode,
       ],
     );
     for (const l of lines) {

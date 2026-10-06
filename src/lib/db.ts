@@ -88,6 +88,41 @@ async function seedFresh(q: Queryable, run: (sql: string) => Promise<unknown>) {
   }
 }
 
+const MIGRATIONS_DIR = () => path.join(root(), "db", "migrations");
+
+/**
+ * Applies db/migrations/*.sql in filename order, once each (recorded in schema_migrations).
+ * The common case — nothing pending — is a single read-only query, so warm/cold starts never
+ * take table locks. Pending work runs under an advisory lock so concurrent instances don't race.
+ */
+export async function migrate(db: Db, hosted: boolean) {
+  const dir = MIGRATIONS_DIR();
+  const files = fs.readdirSync(dir).filter((f) => f.endsWith(".sql")).sort();
+  const appliedNames = async (q: Queryable) =>
+    new Set((await q.query<{ name: string }>("select name from schema_migrations")).map((r) => r.name));
+
+  const [{ has }] = await db.query<{ has: boolean }>("select to_regclass('public.schema_migrations') is not null as has");
+  const quick = has ? await appliedNames(db) : new Set<string>();
+  if (files.every((f) => quick.has(f))) return;
+
+  const apply = async (q: Queryable, run: (sql: string) => Promise<unknown>) => {
+    await run("create table if not exists schema_migrations (name text primary key, applied_at timestamptz not null default now())");
+    const done = await appliedNames(q);
+    for (const f of files.filter((f) => !done.has(f))) {
+      await run(fs.readFileSync(path.join(dir, f), "utf8"));
+      await q.query("insert into schema_migrations (name) values ($1)", [f]);
+    }
+  };
+  if (hosted) {
+    await db.tx(async (q) => {
+      await q.query("select pg_advisory_xact_lock(7000)");
+      await apply(q, (sql) => q.query(sql));
+    });
+  } else {
+    await apply(db, (sql) => db.exec(sql));
+  }
+}
+
 /** Creates a connection and applies schema + catalog seed when the database is empty. */
 export async function createDb(opts: { memory?: boolean } = {}): Promise<Db> {
   const url = process.env.DATABASE_URL;
@@ -117,15 +152,7 @@ export async function createDb(opts: { memory?: boolean } = {}): Promise<Db> {
     await seedFresh(db, (sql) => db.exec(sql));
   }
 
-  // Idempotent upgrades for databases created by an earlier version.
-  if (hosted) {
-    await db.tx(async (q) => {
-      await q.query("select pg_advisory_xact_lock(7000)");
-      await q.query(readSql("migrate.sql"));
-    });
-  } else {
-    await db.exec(readSql("migrate.sql"));
-  }
+  await migrate(db, hosted);
 
   const { ensureAdminFromEnv } = await import("./seed");
   await ensureAdminFromEnv(db);

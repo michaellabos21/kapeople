@@ -49,7 +49,7 @@ payment breakdown, best sellers, low stock), offline banner.
 
 **Admin** — everything in Reports plus customer and loyalty stats, menu on/off + price editing, and **staff & admin account management** (add accounts, deactivate/reactivate, reset passwords with a one-time generated password). Everyone can change their own password.
 
-**Security** — passwords are scrypt-hashed; sign-in locks for 15 minutes after 5 failed attempts per email (an admin password reset lifts it); deactivated accounts are signed out immediately; `db/migrate.sql` upgrades existing databases on start.
+**Security** — passwords are scrypt-hashed; sign-in locks for 15 minutes after 5 failed attempts per email (an admin password reset lifts it); deactivated accounts are signed out immediately; versioned migrations in `db/migrations/` upgrade existing databases on start (each runs once; nothing pending = one read-only query). Sign-ups are limited to 10/hour and failed logins to 20 per 15 minutes per IP; unknown-email and wrong-password logins take the same time.
 
 ## Business rules
 
@@ -62,7 +62,8 @@ payment breakdown, best sellers, low stock), offline banner.
   be sold twice, and products whose ingredients run out show as sold out and are rejected at checkout.
 - **Payments:** POS records cash (with change), GCash and card. In the customer app, GCash/card are **simulated**
   (a `SIMULATED-…` reference, no real charge) and cash is paid at pickup. An unpaid order can't be completed.
-- **Duplicates:** checkout sends an idempotency key, so double-taps and retries create one order.
+- **Duplicates:** checkout sends an idempotency key (scoped to the signed-in user), so double-taps and retries create one order.
+- **Promos:** `WELCOME10` is once per customer (cancelled orders free it up); `PASTRY30` is unlimited. Set `promotions.max_uses_per_customer` to change a limit.
 - **Order numbers** are gapless, starting at #1001.
 - Cancelling: customers can cancel while the order is still *New*; staff can cancel any open order.
   Paid orders get a refund record. Refunding a completed order optionally returns ingredients to stock.
@@ -70,7 +71,7 @@ payment breakdown, best sellers, low stock), offline banner.
 ## Tests
 
 ```bash
-npm test          # 31 tests against a real in-memory Postgres
+npm test          # 40 tests against a real in-memory Postgres
 npm run typecheck
 ```
 
@@ -122,6 +123,7 @@ until that is added.
 
 ```
 db/schema.sql, db/seed.sql        schema + demo catalogue
+db/migrations/                    versioned upgrades, applied once each on start
 src/lib/services/                 orders, inventory, loyalty, reports, catalog, auth, notifications
 src/lib/db.ts                     PGlite (default) or node-postgres (DATABASE_URL)
 src/app/api/                      HTTP API

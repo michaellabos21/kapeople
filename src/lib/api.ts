@@ -51,3 +51,14 @@ export function route(
 
 export const STAFF: Role[] = ["employee", "admin"];
 export const ANY: Role[] = ["customer", "employee", "admin"];
+
+/**
+ * Best available client IP for throttling, or null if there isn't a trustworthy one.
+ * Netlify sets x-nf-client-connection-ip itself; x-forwarded-for is only used as a fallback.
+ */
+export function clientIp(req: NextRequest): string | null {
+  const nf = req.headers.get("x-nf-client-connection-ip");
+  if (nf) return nf.trim();
+  const fwd = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
+  return fwd || null;
+}

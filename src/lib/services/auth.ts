@@ -3,6 +3,7 @@ import { promisify } from "node:util";
 import type { Queryable, Row } from "../db";
 import type { Role } from "../config";
 import { AppError } from "../errors";
+import { assertUnderLimit, recordEvent } from "./ratelimit";
 
 const scrypt = promisify(_scrypt) as (pw: string, salt: Buffer, len: number) => Promise<Buffer>;
 
@@ -43,7 +44,10 @@ async function createSession(q: Queryable, userId: number): Promise<string> {
 export async function signup(
   q: Queryable,
   input: { name: string; email: string; password: string; phone?: string },
+  ip?: string | null,
 ) {
+  await assertUnderLimit(q, "signup", ip, 10, 60, "Too many sign-ups from this network. Please try again later.");
+  await recordEvent(q, "signup", ip); // count attempts, not just successes, so existing-email probing is throttled too
   const email = input.email.trim().toLowerCase();
   const [dupe] = await q.query("select 1 from users where email = $1", [email]);
   if (dupe) throw new AppError("An account with this email already exists.", 409);
@@ -59,7 +63,11 @@ export async function signup(
 const MAX_FAILED_LOGINS = 5; // per email, per 15 minutes
 export const MIN_PASSWORD = 12;
 
-export async function login(q: Queryable, emailRaw: string, password: string) {
+/** Verified against when the email is unknown, so unknown and wrong-password logins take the same time. */
+let dummyHash: Promise<string> | undefined;
+
+export async function login(q: Queryable, emailRaw: string, password: string, ip?: string | null) {
+  await assertUnderLimit(q, "login-fail", ip, 20, 15, "Too many failed attempts from this network. Please wait 15 minutes and try again.");
   const email = emailRaw.trim().toLowerCase();
   const [{ n }] = await q.query<{ n: number }>(
     "select count(*)::int as n from login_attempts where email = $1 and not success and created_at > now() - interval '15 minutes'",
@@ -70,8 +78,9 @@ export async function login(q: Queryable, emailRaw: string, password: string) {
   }
 
   const [row] = await q.query<Row>("select * from users where email = $1", [email]);
-  const valid = !!row && (await verifyPassword(password, row.password_hash));
-  if (!valid) {
+  const valid = await verifyPassword(password, row ? row.password_hash : await (dummyHash ??= hashPassword("not-a-real-password")));
+  if (!valid || !row) {
+    await recordEvent(q, "login-fail", ip);
     await q.query("delete from login_attempts where created_at < now() - interval '1 day'");
     await q.query("insert into login_attempts (email, success) values ($1, false)", [email]);
     throw new AppError("Incorrect email or password.", 401);
