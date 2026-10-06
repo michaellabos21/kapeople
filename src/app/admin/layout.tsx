@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { currentUser } from "@/lib/session";
 import { SignOutButton } from "@/components/SignOutButton";
 import { AdminHeaderActions } from "@/components/AdminHeaderActions";
+import { AdminNav } from "@/components/AdminNav";
 
 export const dynamic = "force-dynamic";
 
@@ -13,6 +14,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     <div className="min-h-dvh">
       <header className="flex items-center gap-4 border-b border-line bg-card px-5 py-3">
         <span className="font-display text-lg font-bold">Kapeople <span className="text-sm font-semibold text-brand">Admin</span></span>
+        <AdminNav />
         <span className="flex-1" />
         <Link href="/pos" className="text-sm font-semibold text-brand">Open POS</Link>
         <AdminHeaderActions />

@@ -24,6 +24,7 @@ describe("migrations", () => {
     expect(first.map((m) => m.name)).toEqual([
       "001_staff_and_login_attempts.sql",
       "002_promo_limits_and_rate_events.sql",
+      "003_customer_notes.sql",
     ]);
     await migrate(db, false);
     expect(await names()).toEqual(first); // nothing re-applied

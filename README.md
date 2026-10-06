@@ -47,7 +47,7 @@ orders, collect-payment-on-pickup, cancel, refund, transaction history, ingredie
 waste, recount, low-stock flags, movement log), reports (today / week / month: sales, orders, average order,
 payment breakdown, best sellers, low stock), offline banner.
 
-**Admin** — everything in Reports plus customer and loyalty stats, menu on/off + price editing, and **staff & admin account management** (add accounts, deactivate/reactivate, reset passwords with a one-time generated password). Everyone can change their own password.
+**Admin** — everything in Reports plus customer and loyalty stats, menu on/off + price editing, a **Customers** database (search, sort, spend/orders/points per customer, order and points history, internal notes, manual points adjustments with an audit trail, block/restore, CSV export), and **staff & admin account management** (add accounts, deactivate/reactivate, reset passwords with a one-time generated password). Everyone can change their own password.
 
 **Security** — passwords are scrypt-hashed; sign-in locks for 15 minutes after 5 failed attempts per email (an admin password reset lifts it); deactivated accounts are signed out immediately; versioned migrations in `db/migrations/` upgrade existing databases on start (each runs once; nothing pending = one read-only query). Sign-ups are limited to 10/hour and failed logins to 20 per 15 minutes per IP; unknown-email and wrong-password logins take the same time.
 
@@ -71,7 +71,7 @@ payment breakdown, best sellers, low stock), offline banner.
 ## Tests
 
 ```bash
-npm test          # 40 tests against a real in-memory Postgres
+npm test          # 47 tests against a real in-memory Postgres
 npm run typecheck
 ```
 
