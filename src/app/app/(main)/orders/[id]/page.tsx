@@ -6,6 +6,7 @@ import { api } from "@/lib/client/api";
 import { useLive } from "@/lib/client/live";
 import { Receipt, PrintButton, type ReceiptOrder } from "@/components/Receipt";
 import { ErrorNote, LoadState, StatusBadge, useDialog } from "@/components/ui";
+import { PushNudge } from "@/components/PushToggle";
 import { ORDER_FLOW, STATUS_LABEL } from "@/lib/config";
 
 const BLURB: Record<string, string> = {
@@ -56,6 +57,8 @@ export default function OrderPage() {
         <p className="mt-3 text-sm text-white/85">{o.status === "ready" ? `Order #${o.order_number} is ready!` : BLURB[o.status]}</p>
         {o.status === "completed" && o.points_earned > 0 && <p className="mt-2 text-sm font-semibold">⭐ +{o.points_earned} points added</p>}
       </div>
+
+      {!closed && o.status !== "completed" && <PushNudge />}
 
       {!closed && (
         <ol className="flex items-center justify-between px-1" aria-label="Order progress">

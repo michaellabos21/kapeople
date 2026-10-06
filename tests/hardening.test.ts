@@ -25,6 +25,7 @@ describe("migrations", () => {
       "001_staff_and_login_attempts.sql",
       "002_promo_limits_and_rate_events.sql",
       "003_customer_notes.sql",
+      "004_push_subscriptions.sql",
     ]);
     await migrate(db, false);
     expect(await names()).toEqual(first); // nothing re-applied
@@ -87,16 +88,41 @@ describe("promo limits", () => {
 });
 
 describe("throttling and enumeration", () => {
-  it("limits sign-ups to 10 per hour per IP, independently per IP, and ignores unknown IPs", async () => {
-    for (let i = 0; i < 10; i++) await signup(db, { name: "N", email: `n${i}@example.test`, password: "longenough-password" }, "1.2.3.4");
-    await expect(signup(db, { name: "N", email: "n11@example.test", password: "longenough-password" }, "1.2.3.4")).rejects.toMatchObject({ status: 429 });
-    await expect(signup(db, { name: "N", email: "n12@example.test", password: "longenough-password" }, "5.6.7.8")).resolves.toBeTruthy();
-    for (let i = 0; i < 12; i++) await signup(db, { name: "N", email: `u${i}@example.test`, password: "longenough-password" }, null);
+  const newcomer = (n: number | string, ip?: string | null) =>
+    signup(db, { name: "N", email: `n${n}@example.test`, password: "longenough-password" }, ip);
+
+  it("allows 100 sign-ups per hour from one network (shared Wi-Fi) and then slows that network down", async () => {
+    await db.query("insert into rate_events (bucket, key) select 'signup', '7.7.7.7' from generate_series(1, 99)");
+    await expect(newcomer(1, "7.7.7.7")).resolves.toBeTruthy(); // the 100th
+    await expect(newcomer(2, "7.7.7.7")).rejects.toMatchObject({ status: 429 });
+    await expect(newcomer(3, "8.8.4.4")).resolves.toBeTruthy(); // other networks unaffected
+    await expect(newcomer(4, null)).resolves.toBeTruthy(); // unknown IP: only the global cap applies
   });
 
-  it("probing existing emails via signup also counts toward the limit", async () => {
-    for (let i = 0; i < 10; i++) await signup(db, { name: "N", email: "valerie@example.test", password: "longenough-password" }, "9.9.9.9").catch(() => {});
-    await expect(signup(db, { name: "N", email: "free@example.test", password: "longenough-password" }, "9.9.9.9")).rejects.toMatchObject({ status: 429 });
+  it("caps sign-ups site-wide at 60 per minute", async () => {
+    await db.query("insert into rate_events (bucket, key) select 'signup-global', 'all' from generate_series(1, 59)");
+    await expect(newcomer(1, "1.1.1.1")).resolves.toBeTruthy();
+    await expect(newcomer(2, "2.2.2.2")).rejects.toMatchObject({ status: 429, message: expect.stringMatching(/lot of sign-ups/) });
+  });
+
+  it("throttles guessing the mobile number of an imported account, without letting a stranger lock the owner out", async () => {
+    await db.query(
+      "insert into users (role, name, email, phone, password_hash) values ('customer','Imported','imp@example.test','09171234567','!unclaimed')",
+    );
+    const claim = (phone: string, ip: string) => signup(db, { name: "Me", email: "imp@example.test", password: "longenough-password", phone }, ip);
+    for (let i = 0; i < 5; i++) await expect(claim(`0917000000${i}`, "6.6.6.6")).rejects.toMatchObject({ code: "email_taken", status: 409 });
+    await expect(claim("09171234567", "6.6.6.6")).rejects.toMatchObject({ status: 429 }); // the guesser is locked out
+    await expect(claim("09171234567", "5.5.5.5")).resolves.toBeTruthy(); // the real owner, elsewhere, can still activate
+  });
+
+  it("caps guessing per email across all networks", async () => {
+    await db.query(
+      "insert into users (role, name, email, phone, password_hash) values ('customer','Imported','imp@example.test','09171234567','!unclaimed')",
+    );
+    await db.query("insert into rate_events (bucket, key) select 'claim-fail-email', 'imp@example.test' from generate_series(1, 50)");
+    await expect(
+      signup(db, { name: "Me", email: "imp@example.test", password: "longenough-password", phone: "09171234567" }, "3.3.3.3"),
+    ).rejects.toMatchObject({ status: 429 });
   });
 
   it("blocks an IP after 20 failed logins across different emails, even for valid credentials", async () => {

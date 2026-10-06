@@ -74,8 +74,8 @@ describe("importing and claiming", () => {
   it("claiming needs the same email AND mobile number, then sets the password", async () => {
     await importCustomers(db, parseSignupSheet(SHEET).rows, { apply: true });
     const attempt = (phone?: string) => signup(db, { name: "Jay-R S.", email: "SausaRomeoJr@gmail.com", password: "my-new-password-1", phone });
-    await expect(attempt()).rejects.toMatchObject({ code: "claim_phone", status: 409 });
-    await expect(attempt("09111111111")).rejects.toMatchObject({ code: "claim_phone" });
+    await expect(attempt()).rejects.toMatchObject({ code: "email_taken", status: 409 });
+    await expect(attempt("09111111111")).rejects.toMatchObject({ code: "email_taken" });
 
     const claimed = await attempt("+63 936 937 2910"); // same number, different format
     expect(claimed.user.email).toBe("sausaromeojr@gmail.com");
@@ -85,6 +85,15 @@ describe("importing and claiming", () => {
 
     // once claimed it's a normal account: a second signup can't take it over
     await expect(attempt("09369372910")).rejects.toThrow(/already exists/);
+  });
+
+  it("does not reveal which emails are on the imported list: every taken email gets the identical 409", async () => {
+    await importCustomers(db, parseSignupSheet(SHEET).rows, { apply: true });
+    const msg = (email: string) => signup(db, { name: "X", email, password: "longenough-password" }).catch((e) => `${e.status} ${e.code} ${e.message}`);
+    const imported = await msg("sausaromeojr@gmail.com");
+    expect(imported).toMatch(/^409 email_taken .*enter the same mobile number/);
+    expect(await msg("valerie@example.test")).toBe(imported); // ordinary account
+    expect(await msg("staff@kapeople.test")).toBe(imported); // staff account
   });
 
   it("a normal account's email can't be claimed, and staff emails are never claimable", async () => {

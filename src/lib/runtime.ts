@@ -16,3 +16,16 @@ export function clientIpFrom(h: { get(name: string): string | null }): string | 
   if (process.env.NETLIFY) return first(h.get("x-nf-client-connection-ip")) ?? first(h.get("x-forwarded-for"));
   return first(h.get("x-nf-client-connection-ip")) ?? first(h.get("x-forwarded-for")); // local / self-hosted behind a proxy
 }
+
+/**
+ * Run work after the HTTP response has been sent (Next's after(): keeps a serverless function alive until it
+ * finishes, without making the user wait). Outside a request (tests, scripts) it simply runs inline.
+ */
+export async function defer(fn: () => Promise<unknown>): Promise<void> {
+  try {
+    const { after } = await import("next/server");
+    after(fn);
+  } catch {
+    await fn();
+  }
+}

@@ -4,8 +4,10 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { api } from "@/lib/client/api";
 import { useLive } from "@/lib/client/live";
-import { ToastProvider, useToast } from "./ui";
+import { Modal, ToastProvider, useToast } from "./ui";
 import { ChangePasswordButton } from "./ChangePasswordModal";
+import { PushToggle } from "./PushToggle";
+import { detachDevice, usePushSync } from "@/lib/client/push";
 
 const TABS = [
   { href: "/pos", label: "Sales" },
@@ -33,6 +35,8 @@ function Inner({ name, role, children }: { name: string; role: string; children:
   const router = useRouter();
   const toast = useToast();
   const [online, setOnline] = useState(true);
+  const [alertsOpen, setAlertsOpen] = useState(false);
+  usePushSync(); // re-attach this device to the signed-in user
   const seen = useRef<Set<number> | null>(null);
 
   const { data, error } = useLive(() => api<{ orders: { id: number; order_number: number; source: string }[] }>("/api/orders?status=new"), ["orders"], 10000);
@@ -83,10 +87,12 @@ function Inner({ name, role, children }: { name: string; role: string; children:
           </span>
           {role === "admin" && <Link href="/admin" className="font-semibold text-brand">Admin</Link>}
           <span className="text-muted">{name}</span>
+          <button className="font-semibold text-muted hover:text-ink" onClick={() => setAlertsOpen(true)}>Alerts</button>
           <ChangePasswordButton />
           <button
             className="font-semibold text-muted hover:text-ink"
             onClick={async () => {
+              await detachDevice(); // this account stops getting alerts on this device; the next login resumes them
               await api("/api/auth/logout", {});
               router.replace("/pos/login");
               router.refresh();
@@ -101,6 +107,9 @@ function Inner({ name, role, children }: { name: string; role: string; children:
           Connection lost — changes can&apos;t be saved until you&apos;re back online. Don&apos;t take payments you can&apos;t record.
         </div>
       )}
+      <Modal open={alertsOpen} onClose={() => setAlertsOpen(false)} title="Alerts on this device">
+        <PushToggle audience="staff" />
+      </Modal>
       <div className="min-h-0 flex-1">{children}</div>
     </div>
   );

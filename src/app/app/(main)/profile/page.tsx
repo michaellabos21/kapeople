@@ -3,6 +3,8 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/client/api";
 import { ChangePasswordButton } from "@/components/ChangePasswordModal";
+import { PushToggle } from "@/components/PushToggle";
+import { detachDevice } from "@/lib/client/push";
 import { ErrorNote, LoadState, useToast } from "@/components/ui";
 
 interface Me { name: string; email: string; phone: string | null }
@@ -12,7 +14,6 @@ export default function ProfilePage() {
   const toast = useToast();
   const [me, setMe] = useState<Me | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [perm, setPerm] = useState<string>("default");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -22,7 +23,6 @@ export default function ProfilePage() {
   }, []);
   useEffect(() => {
     load();
-    if (typeof Notification !== "undefined") setPerm(Notification.permission);
   }, [load]);
   if (!me) return <LoadState error={loadError} onRetry={load} />;
 
@@ -66,15 +66,12 @@ export default function ProfilePage() {
 
       <div className="flex justify-center"><ChangePasswordButton className="!text-brand" /></div>
 
-      {typeof Notification !== "undefined" && perm !== "granted" && perm !== "denied" && (
-        <button className="btn-secondary w-full" onClick={async () => setPerm(await Notification.requestPermission())}>
-          Turn on order alerts
-        </button>
-      )}
-      {perm === "denied" && <p className="text-center text-xs text-muted">Order alerts are blocked in your browser settings.</p>}
+      <PushToggle />
+
       <button
         className="btn-secondary w-full"
         onClick={async () => {
+          await detachDevice(); // this account stops getting alerts on this device; the next login resumes them
           await api("/api/auth/logout", {});
           try { localStorage.removeItem("kapeople.cart.v1"); } catch {}
           router.replace("/app/login");

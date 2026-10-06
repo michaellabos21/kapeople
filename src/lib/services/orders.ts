@@ -4,6 +4,8 @@ import { AppError } from "../errors";
 import { ACTIVE_STATUSES, ORDER_FLOW, pointsForTotal, type OrderStatus, type PaymentMethod, type Role } from "../config";
 import { availableStock, computeUsage, loadCatalog, type Addon } from "./catalog";
 import { announce, notify } from "./notifications";
+import { pushToStaff } from "./push";
+import { defer } from "../runtime";
 import { publish } from "../bus";
 
 export interface Actor {
@@ -245,7 +247,22 @@ export async function createOrder(db: Db, actor: Actor, input: CreateOrderInput)
   });
 
   if (!result.duplicate) {
-    announce(result.customerId, result.id);
+    await announce(db, result.customerId, result.id);
+    if (!staff) {
+      // New customer order → alert the counter's devices (after the response).
+      await defer(async () => {
+        try {
+          const [o] = await db.query<{ order_number: number; total: number; items: string }>(
+            `select o.order_number, o.total, (select string_agg(i.qty || '× ' || i.name, ', ' order by i.id) from order_items i where i.order_id = o.id) as items
+               from orders o where o.id = $1`,
+            [result.id],
+          );
+          await pushToStaff(db, { title: `New order #${o.order_number}`, body: `${o.items} · ₱${o.total}`, url: "/pos/orders", tag: `new-order-${result.id}` });
+        } catch (e) {
+          console.error("staff push failed:", (e as Error).message);
+        }
+      });
+    }
     if (input.completeNow && staff) await setStatus(db, actor, result.id, "completed");
   }
   return { order: await getOrder(db, result.id), duplicate: result.duplicate };
@@ -333,7 +350,7 @@ export async function setStatus(db: Db, actor: Actor, id: number, next: OrderSta
     }
     return order.customer_id as number | null;
   });
-  announce(customerId, id);
+  await announce(db, customerId, id);
   if (next === "completed") publish({ type: "inventory" });
   return getOrder(db, id);
 }
@@ -364,7 +381,7 @@ export async function recordPayment(
     );
     await q.query("update orders set payment_status = 'paid', payment_method = $2, updated_at = now() where id = $1", [id, p.method]);
   });
-  announce(null, id);
+  await announce(db, null, id);
   return getOrder(db, id);
 }
 
@@ -412,7 +429,7 @@ export async function cancelOrder(db: Db, actor: Actor, id: number, reason?: str
     }
     return order.customer_id as number | null;
   });
-  announce(customerId, id);
+  await announce(db, customerId, id);
   return getOrder(db, id);
 }
 
@@ -460,7 +477,7 @@ export async function refundOrder(db: Db, actor: Actor, id: number, opts: { rest
     }
     return order.customer_id as number | null;
   });
-  announce(customerId, id);
+  await announce(db, customerId, id);
   if (opts.restock) publish({ type: "inventory" });
   return getOrder(db, id);
 }

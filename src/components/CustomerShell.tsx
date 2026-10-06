@@ -4,6 +4,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { CartProvider, useCart } from "@/lib/client/cart";
 import { useEvents } from "@/lib/client/live";
+import { usePushSync } from "@/lib/client/push";
 import { api } from "@/lib/client/api";
 import { peso } from "@/lib/format";
 import { ToastProvider, useToast } from "./ui";
@@ -31,6 +32,7 @@ function Inner({ children }: { children: ReactNode }) {
   const cart = useCart();
   const [unread, setUnread] = useState(0);
   const seen = useRef<number | null>(null);
+  usePushSync(); // re-attach this device to the signed-in user
 
   const refreshNotes = useCallback(async () => {
     try {
@@ -42,7 +44,7 @@ function Inner({ children }: { children: ReactNode }) {
           toast(`${n.title}${n.body ? " — " + n.body : ""}`, n.title.includes("ready") ? "ok" : "info");
           // Browser notification stands in for push until Firebase Cloud Messaging is wired up.
           if (typeof Notification !== "undefined" && Notification.permission === "granted") {
-            new Notification(n.title, { body: n.body });
+            new Notification(n.title, { body: n.body, tag: n.order_id ? `order-${n.order_id}` : undefined });
           }
         }
       }

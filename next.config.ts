@@ -7,6 +7,18 @@ const nextConfig: NextConfig = {
   // PGlite (embedded Postgres) must stay a plain Node dependency, not bundled.
   // db/*.sql is read at runtime to create the schema on first start, so make sure it ships with the server bundle.
   outputFileTracingIncludes: { "/**": ["./db/**/*"] },
+  // The service worker must always be re-fetched so updates reach installed apps.
+  async headers() {
+    return [
+      {
+        source: "/sw.js",
+        headers: [
+          { key: "Cache-Control", value: "no-cache, no-store, must-revalidate" },
+          { key: "Service-Worker-Allowed", value: "/" },
+        ],
+      },
+    ];
+  },
   serverExternalPackages: ["@electric-sql/pglite", "pg"],
 };
 

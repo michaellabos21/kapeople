@@ -49,7 +49,16 @@ payment breakdown, best sellers, low stock), offline banner.
 
 **Admin** — everything in Reports plus customer and loyalty stats, menu on/off + price editing, a **Customers** database (search, sort, spend/orders/points per customer, order and points history, internal notes, manual points adjustments with an audit trail, block/restore, CSV export), and **staff & admin account management** (add accounts, deactivate/reactivate, reset passwords with a one-time generated password). Everyone can change their own password.
 
-**Security** — passwords are scrypt-hashed; sign-in locks for 15 minutes after 5 failed attempts per email (an admin password reset lifts it); deactivated accounts are signed out immediately; versioned migrations in `db/migrations/` upgrade existing databases on start (each runs once; nothing pending = one read-only query). Sign-ups are limited to 10/hour and failed logins to 20 per 15 minutes per IP; unknown-email and wrong-password logins take the same time.
+**Security** — passwords are scrypt-hashed; sign-in locks for 15 minutes after 5 failed attempts per email (an admin password reset lifts it); deactivated accounts are signed out immediately; versioned migrations in `db/migrations/` upgrade existing databases on start (each runs once; nothing pending = one read-only query). Failed logins are limited to 20 per 15 minutes per IP and 5 per email; sign-ups to 100/hour per network and 60/minute site-wide; guessing the mobile number of an imported account to 5 tries per email per network (50/hour per email overall); unknown-email and wrong-password logins take the same time.
+
+## Push notifications
+
+Web Push (no Firebase): customers get an alert when their order is accepted, being prepared, ready and completed; staff
+devices get "New order #…" alerts. Customers turn it on from **Profile → Order alerts** or the prompt on an active order;
+staff from **Alerts** in the POS header. Set `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` and `VAPID_SUBJECT` (see
+`.env.example`); without them the feature stays off. **iPhone/iPad only deliver push to an app added to the Home Screen
+(iOS 16.4+)**; Android and desktop browsers work directly. Dead subscriptions are removed automatically, push endpoints are restricted to the real browser push services, alerts are
+sent after the response so a slow push service never delays an order, and a push failure never affects an order.
 
 ## Importing customers
 
@@ -94,7 +103,7 @@ the installed app, other browsers, or twice. To preview it anywhere, open `/app/
 ## Tests
 
 ```bash
-npm test          # 70 tests against a real in-memory Postgres
+npm test          # 86 tests against a real in-memory Postgres
 npm run typecheck
 ```
 

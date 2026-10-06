@@ -52,35 +52,52 @@ export function samePhone(a?: string | null, b?: string | null): boolean {
   return tail(a).length === 10 && tail(a) === tail(b);
 }
 
+/**
+ * Sign-up is throttled generously: 100 per hour per network (shared Wi-Fi / carrier NAT is common) and 60 per
+ * minute across the whole site, which stops mass account creation and bulk email probing without hurting real use.
+ */
+const SIGNUP_PER_IP_PER_HOUR = 100;
+const SIGNUP_GLOBAL_PER_MINUTE = 60;
+
+const EMAIL_TAKEN_MESSAGE =
+  "An account with this email already exists. If you signed up with us earlier, enter the same mobile number you used then.";
+
 export async function signup(
   q: Queryable,
   input: { name: string; email: string; password: string; phone?: string },
   ip?: string | null,
 ) {
-  await assertUnderLimit(q, "signup", ip, 10, 60, "Too many sign-ups from this network. Please try again later.");
-  await recordEvent(q, "signup", ip); // count attempts, not just successes, so existing-email probing is throttled too
+  await assertUnderLimit(q, "signup", ip, SIGNUP_PER_IP_PER_HOUR, 60, "Too many sign-ups from this network. Please try again in a little while.");
+  await assertUnderLimit(q, "signup-global", "all", SIGNUP_GLOBAL_PER_MINUTE, 1, "We're getting a lot of sign-ups right now. Please try again in a minute.");
+  await recordEvent(q, "signup", ip);
+  await recordEvent(q, "signup-global", "all");
+
   const email = input.email.trim().toLowerCase();
   const [dupe] = await q.query<Row>("select id, role, phone, password_hash from users where email = $1", [email]);
   if (dupe) {
-    // Customers imported from a sign-up sheet have no password yet: let them claim the account with the
-    // same email AND the same mobile number they gave when they signed up.
+    // Customers imported from a sign-up sheet have no password yet: they can claim the account with the same
+    // email AND mobile number. Every "email exists" case gets the SAME 409, so this endpoint doesn't reveal
+    // which emails are on the imported list.
     if (dupe.role === "customer" && hasNoPassword(dupe.password_hash)) {
+      // Guessing mobile numbers to take over an imported account is throttled: 5 misses per 15 min from one
+      // network for one email (so a stranger can't lock the real owner out), and 50 per hour for the email overall.
+      const who = `${email}|${ip ?? "?"}`;
+      await assertUnderLimit(q, "claim-fail", who, 5, 15, "Too many attempts. Please wait 15 minutes and try again.");
+      await assertUnderLimit(q, "claim-fail-email", email, 50, 60, "Too many attempts for this email. Please try again later.");
       if (!samePhone(dupe.phone, input.phone)) {
-        throw new AppError(
-          "This email is already on our sign-up list. Enter the same mobile number you signed up with to activate your account.",
-          409,
-          "claim_phone",
-        );
+        await recordEvent(q, "claim-fail", who);
+        await recordEvent(q, "claim-fail-email", email);
+        throw new AppError(EMAIL_TAKEN_MESSAGE, 409, "email_taken");
       }
       const [claimed] = await q.query<User>(
         `update users set password_hash = $2, name = $3 where id = $1 and password_hash like '!%'
          returning ${USER_COLS}`,
         [dupe.id, await hashPassword(input.password), input.name.trim()],
       );
-      if (!claimed) throw new AppError("An account with this email already exists.", 409);
+      if (!claimed) throw new AppError(EMAIL_TAKEN_MESSAGE, 409, "email_taken");
       return { user: claimed, token: await createSession(q, claimed.id) };
     }
-    throw new AppError("An account with this email already exists.", 409);
+    throw new AppError(EMAIL_TAKEN_MESSAGE, 409, "email_taken");
   }
   const hash = await hashPassword(input.password);
   const [user] = await q.query<User>(
