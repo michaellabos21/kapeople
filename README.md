@@ -64,6 +64,8 @@ disabled, and the public menu no longer exposes recipe quantities.
 The customer app is installable: on iPhone open https://YOUR-SITE/app in **Safari → Share → Add to Home Screen**; it then
 opens full screen without Safari's bars (the POS installs the same way from `/pos`). Notes: the installed app keeps its
 own cookies, so sign in again inside it; after changing manifest/icon settings, delete the old icon and add it again.
+First-time visitors in iPhone/iPad Safari see a one-time "Add to Home Screen" hint (`InstallPrompt`); it is never shown in
+the installed app, other browsers, or twice. To preview it anywhere, open `/app/login?install-preview=iphone` (or `ipad`).
 
 ## Business rules
 
@@ -85,7 +87,7 @@ own cookies, so sign in again inside it; after changing manifest/icon settings, 
 ## Tests
 
 ```bash
-npm test          # 54 tests against a real in-memory Postgres
+npm test          # 59 tests against a real in-memory Postgres
 npm run typecheck
 ```
 
