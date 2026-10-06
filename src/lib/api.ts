@@ -3,6 +3,7 @@ import { ZodError } from "zod";
 import { getDb, type Db } from "./db";
 import { AppError } from "./errors";
 import { currentUser } from "./session";
+import { clientIpFrom } from "./runtime";
 import type { Role } from "./config";
 import type { User } from "./services/auth";
 
@@ -52,13 +53,7 @@ export function route(
 export const STAFF: Role[] = ["employee", "admin"];
 export const ANY: Role[] = ["customer", "employee", "admin"];
 
-/**
- * Best available client IP for throttling, or null if there isn't a trustworthy one.
- * Netlify sets x-nf-client-connection-ip itself; x-forwarded-for is only used as a fallback.
- */
+/** Client IP for throttling (see clientIpFrom for the per-platform trust rules). */
 export function clientIp(req: NextRequest): string | null {
-  const nf = req.headers.get("x-nf-client-connection-ip");
-  if (nf) return nf.trim();
-  const fwd = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
-  return fwd || null;
+  return clientIpFrom(req.headers);
 }

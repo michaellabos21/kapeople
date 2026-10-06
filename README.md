@@ -87,7 +87,7 @@ the installed app, other browsers, or twice. To preview it anywhere, open `/app/
 ## Tests
 
 ```bash
-npm test          # 59 tests against a real in-memory Postgres
+npm test          # 63 tests against a real in-memory Postgres
 npm run typecheck
 ```
 
@@ -111,7 +111,16 @@ In production the well-known demo accounts (`*@kapeople.test`) are **not** creat
 only for a throwaway demo). Live updates fall back to polling (`DISABLE_SSE=true` in `netlify.toml`), so status
 changes show up within ~8–15 seconds instead of instantly.
 
-**Not yet verified:** the hosted-Postgres path and a real Netlify deploy have not been run. Anyone can sign up as a
+### Vercel
+
+`vercel.json` pins functions to `bom1` (Mumbai) next to the Supabase `ap-south-1` database; change it if your database is elsewhere.
+1. *Add New → Project*, import this repo. Vercel deploys the **Production Branch** (default `main`) — merge the branch first or
+   change it under *Settings → Environments → Production → Branch Tracking*.
+2. Add `DATABASE_URL` (mark it Sensitive) under *Settings → Environment Variables*. `ADMIN_EMAIL`/`ADMIN_PASSWORD` are only
+   needed on an empty database. Live updates fall back to polling automatically on Vercel and Netlify.
+3. Both hosts can share one database. Cookies are per domain, so sign in separately on each.
+
+**Not yet verified:** a first Vercel deploy has not been run. Anyone can sign up as a
 customer on a public deployment, and login has no rate limiting — put the site behind Netlify password protection
 until that is added.
 
