@@ -80,8 +80,8 @@ function Inner({ children }: { children: ReactNode }) {
 
   const showCartBar = cart.count > 0 && !path.startsWith("/app/cart") && !path.startsWith("/app/product");
   return (
-    <div className="mx-auto min-h-dvh max-w-md bg-paper pb-28 shadow-[0_0_60px_rgba(0,0,0,0.06)]">
-      <header className="sticky top-0 z-30 flex items-center justify-between border-b border-line bg-paper/90 px-5 py-3 backdrop-blur">
+    <div className="mx-auto min-h-dvh max-w-md bg-paper pb-[calc(7rem+env(safe-area-inset-bottom))] shadow-[0_0_60px_rgba(0,0,0,0.06)]">
+      <header className="sticky top-0 z-30 flex items-center justify-between border-b border-line bg-paper/90 px-5 pb-3 pt-[calc(0.75rem+env(safe-area-inset-top))] backdrop-blur">
         <Link href="/app" className="font-display text-xl font-bold">Kapeople</Link>
         <Link href="/app/notifications" aria-label={`Notifications, ${unread} unread`} className="relative rounded-full p-2 text-lg">
           🔔
@@ -96,7 +96,7 @@ function Inner({ children }: { children: ReactNode }) {
       <main className="px-5 py-5">{children}</main>
 
       {showCartBar && (
-        <Link href="/app/cart" className="fixed inset-x-0 bottom-[68px] z-30 mx-auto flex max-w-md justify-center px-4">
+        <Link href="/app/cart" className="fixed inset-x-0 bottom-[calc(68px+env(safe-area-inset-bottom))] z-30 mx-auto flex max-w-md justify-center px-4">
           <span className="btn-primary w-full justify-between shadow-xl">
             <span>View cart · {cart.count} item{cart.count > 1 ? "s" : ""}</span>
             <span>{peso(cart.subtotal)}</span>

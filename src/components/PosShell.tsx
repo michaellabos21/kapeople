@@ -63,7 +63,7 @@ function Inner({ name, role, children }: { name: string; role: string; children:
 
   return (
     <div className="flex h-dvh flex-col bg-paper">
-      <header className="flex flex-wrap items-center gap-x-5 gap-y-1 border-b border-line bg-card px-4 py-2">
+      <header className="flex flex-wrap items-center gap-x-5 gap-y-1 border-b border-line bg-card px-4 pb-2 pt-[calc(0.5rem+env(safe-area-inset-top))]">
         <span className="font-display text-lg font-bold">Kapeople <span className="text-sm font-semibold text-brand">POS</span></span>
         <nav className="flex flex-1 gap-1 overflow-x-auto">
           {TABS.map((t) => {

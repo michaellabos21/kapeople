@@ -59,6 +59,12 @@ replace the browser's `confirm()`/`prompt()`; colours meet WCAG AA contrast (4.5
 touch targets are 44px; each page has its own tab title; POS/admin are `noindex`. Out-of-stock add-ons are
 disabled, and the public menu no longer exposes recipe quantities.
 
+## Install on a phone (full-screen home-screen app)
+
+The customer app is installable: on iPhone open https://YOUR-SITE/app in **Safari → Share → Add to Home Screen**; it then
+opens full screen without Safari's bars (the POS installs the same way from `/pos`). Notes: the installed app keeps its
+own cookies, so sign in again inside it; after changing manifest/icon settings, delete the old icon and add it again.
+
 ## Business rules
 
 - **Prices are computed on the server** from the database; the client's totals are display-only.

@@ -29,6 +29,13 @@ html {
 }
 body {
   min-height: 100dvh;
+  /* Home-screen app: no rubber-banding of the whole page behind the UI. */
+  overscroll-behavior-y: none;
+}
+/* Inside an installed app, keep taps from selecting text / showing callouts on UI chrome. */
+nav,
+button {
+  -webkit-touch-callout: none;
 }
 
 button,
