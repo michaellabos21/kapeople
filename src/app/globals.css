@@ -1,0 +1,105 @@
+@import "tailwindcss";
+
+@theme {
+  --color-ink: #2b1d14;
+  --color-paper: #fbf7f1;
+  --color-card: #ffffff;
+  --color-line: #eadfd0;
+  --color-muted: #6f5f4d;
+  --color-brand: #9a4f15;
+  --color-brand-dark: #7a3f0f;
+  --color-brand-soft: #f7e9d6;
+  --color-ok: #2b6444;
+  --color-ok-soft: #e1f0e7;
+  --color-warn: #7d5208;
+  --color-warn-soft: #fbf0d3;
+  --color-bad: #a03a2a;
+  --color-bad-soft: #f8e0db;
+  --color-info: #2f5f93;
+  --color-info-soft: #e0ebf6;
+  --font-display: ui-serif, "Iowan Old Style", "Palatino Linotype", Georgia, serif;
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+html {
+  background: var(--color-paper);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-tap-highlight-color: transparent;
+}
+body {
+  min-height: 100dvh;
+  /* Home-screen app: no rubber-banding of the whole page behind the UI. */
+  overscroll-behavior-y: none;
+}
+/* Inside an installed app, keep taps from selecting text / showing callouts on UI chrome. */
+nav,
+button {
+  -webkit-touch-callout: none;
+}
+
+button,
+a {
+  touch-action: manipulation;
+}
+/* Visible keyboard focus everywhere (inputs keep their own ring). */
+:focus-visible {
+  outline: 2px solid var(--color-brand);
+  outline-offset: 2px;
+}
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+button:not(:disabled) {
+  cursor: pointer;
+}
+
+@utility btn {
+  @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition active:scale-[0.98] disabled:opacity-50 disabled:active:scale-100;
+}
+@utility btn-primary {
+  @apply btn bg-brand text-white hover:bg-brand-dark;
+}
+@utility btn-secondary {
+  @apply btn border border-line bg-card text-ink hover:bg-brand-soft;
+}
+@utility btn-ghost {
+  @apply btn text-muted hover:bg-brand-soft hover:text-ink;
+}
+@utility btn-danger {
+  @apply btn bg-bad text-white hover:opacity-90;
+}
+@utility input {
+  @apply w-full rounded-xl border border-line bg-card px-3.5 py-2.5 text-[15px] outline-none transition placeholder:text-muted/70 focus:border-brand focus:ring-2 focus:ring-brand/20;
+}
+@utility card {
+  @apply rounded-2xl border border-line bg-card;
+}
+@utility label {
+  @apply mb-1 block text-xs font-semibold uppercase tracking-wide text-muted;
+}
+
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  #receipt,
+  #receipt * {
+    visibility: visible;
+  }
+  #receipt {
+    position: absolute;
+    left: 0;
+    top: 0;
+    border: none;
+  }
+}
