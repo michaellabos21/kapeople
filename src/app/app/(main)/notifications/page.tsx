@@ -4,16 +4,19 @@ import { useEffect } from "react";
 import { api } from "@/lib/client/api";
 import { useLive } from "@/lib/client/live";
 import { timeAgo } from "@/lib/format";
-import { Spinner } from "@/components/ui";
+import { LoadState } from "@/components/ui";
 
 interface N { id: number; title: string; body: string; read: boolean; order_id: number | null; created_at: string }
 
 export default function NotificationsPage() {
-  const { data } = useLive(() => api<{ notifications: N[] }>("/api/notifications"));
+  const { data, error, reload } = useLive(() => api<{ notifications: N[] }>("/api/notifications"));
   useEffect(() => {
-    if (data?.notifications.some((n) => !n.read)) void api("/api/notifications", {});
+    if (data?.notifications.some((n) => !n.read)) {
+      // Tell the shell so the bell badge clears immediately.
+      void api("/api/notifications", {}).then(() => window.dispatchEvent(new Event("kapeople:notifications-read"))).catch(() => {});
+    }
   }, [data]);
-  if (!data) return <Spinner />;
+  if (!data) return <LoadState error={error} onRetry={reload} />;
   return (
     <div className="space-y-4">
       <h1 className="font-display text-3xl font-bold">Notifications</h1>

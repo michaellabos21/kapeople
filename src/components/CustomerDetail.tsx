@@ -4,7 +4,7 @@ import { api } from "@/lib/client/api";
 import { useLive } from "@/lib/client/live";
 import { dateTime, peso } from "@/lib/format";
 import type { OrderStatus } from "@/lib/config";
-import { ErrorNote, Modal, Spinner, StatusBadge, useToast } from "./ui";
+import { ErrorNote, LoadState, Modal, StatusBadge, useDialog, useToast } from "./ui";
 
 interface Detail {
   customer: { id: number; name: string; email: string; phone: string | null; points_balance: number; active: boolean; staff_notes: string | null; created_at: string };
@@ -22,7 +22,8 @@ const Stat = ({ label, value }: { label: string; value: string }) => (
 
 export function CustomerDetailModal({ id, onClose, onChanged }: { id: number; onClose: () => void; onChanged: () => void }) {
   const toast = useToast();
-  const { data, reload } = useLive(() => api<Detail>(`/api/admin/customers/${id}`), [], 60000);
+  const dialog = useDialog();
+  const { data, error: loadError, reload } = useLive(() => api<Detail>(`/api/admin/customers/${id}`), [], 60000);
   const [notes, setNotes] = useState<string | null>(null);
   const [delta, setDelta] = useState("");
   const [reason, setReason] = useState("");
@@ -49,7 +50,7 @@ export function CustomerDetailModal({ id, onClose, onChanged }: { id: number; on
   const c = data?.customer;
   return (
     <Modal open onClose={onClose} title={c?.name ?? "Customer"} wide>
-      {!data || !c ? <Spinner /> : (
+      {!data || !c ? <LoadState error={loadError} onRetry={reload} /> : (
         <div className="space-y-5">
           <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
             <div>
@@ -57,7 +58,10 @@ export function CustomerDetailModal({ id, onClose, onChanged }: { id: number; on
               <p className="text-muted">Joined {new Date(c.created_at).toLocaleDateString("en-PH", { dateStyle: "medium" })}</p>
             </div>
             <button className={c.active ? "btn-secondary text-bad" : "btn-primary"} disabled={busy}
-              onClick={() => (c.active ? confirm(`Block ${c.name}? They will be signed out and unable to sign in.`) : true) && run(() => api(`/api/admin/customers/${id}`, { active: !c.active }, "PATCH"), c.active ? "Customer blocked" : "Customer restored")}>
+              onClick={async () => {
+                if (c.active && !(await dialog.confirm({ title: `Block ${c.name}?`, message: "They will be signed out and unable to sign in. Their orders and points are kept.", confirmLabel: "Block account", danger: true }))) return;
+                void run(() => api(`/api/admin/customers/${id}`, { active: !c.active }, "PATCH"), c.active ? "Customer blocked" : "Customer restored");
+              }}>
               {c.active ? "Block account" : "Restore account"}
             </button>
           </div>

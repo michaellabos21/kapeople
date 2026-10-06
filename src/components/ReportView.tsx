@@ -3,7 +3,7 @@ import { useState } from "react";
 import { api } from "@/lib/client/api";
 import { useLive } from "@/lib/client/live";
 import { peso, qty } from "@/lib/format";
-import { Spinner } from "./ui";
+import { LoadState } from "./ui";
 
 type Range = "today" | "week" | "month";
 interface Report {
@@ -50,7 +50,7 @@ function Bars({ rows, fmt }: { rows: { label: string; value: number; note?: stri
 
 export function ReportView({ extended = false }: { extended?: boolean }) {
   const [range, setRange] = useState<Range>("today");
-  const { data: r } = useLive(() => api<Report>(`/api/reports?range=${range}`), ["orders", "inventory"], 30000, range);
+  const { data: r, error, reload } = useLive(() => api<Report>(`/api/reports?range=${range}`), ["orders", "inventory"], 30000, range);
 
   return (
     <div className="space-y-5">
@@ -59,7 +59,7 @@ export function ReportView({ extended = false }: { extended?: boolean }) {
           <button key={x.id} onClick={() => setRange(x.id)} className={`rounded-full border px-4 py-1.5 text-sm font-semibold ${range === x.id ? "border-ink bg-ink text-white" : "border-line bg-card"}`}>{x.label}</button>
         ))}
       </div>
-      {!r ? <Spinner /> : (
+      {!r ? <LoadState error={error} onRetry={reload} /> : (
         <>
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
             <Stat label="Sales" value={peso(r.sales)} sub="completed orders" />

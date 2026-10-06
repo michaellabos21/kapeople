@@ -93,7 +93,18 @@ export async function availableStock(q: Queryable): Promise<Map<number, number>>
   return new Map(rows.map((r) => [r.id, r.available]));
 }
 
-export interface MenuProduct extends Omit<CatalogProduct, "recipe"> {
+/** Add-on as exposed to clients: no recipe quantities or ingredient ids. */
+export interface MenuAddon {
+  id: number;
+  name: string;
+  price: number;
+  available: boolean;
+  sold_out: boolean;
+  sold_out_reason?: string;
+}
+
+export interface MenuProduct extends Omit<CatalogProduct, "recipe" | "addons"> {
+  addons: MenuAddon[];
   sold_out: boolean;
   sold_out_reason?: string;
 }
@@ -106,9 +117,25 @@ export async function getMenu(q: Queryable) {
     q.query<{ id: number; name: string }>("select id, name from ingredients"),
   ]);
   const ingName = new Map(ingredients.map((i) => [i.id, i.name]));
-  const products: MenuProduct[] = catalog.map(({ recipe, ...p }) => {
+  const products: MenuProduct[] = catalog.map(({ recipe, addons, ...p }) => {
     // Sellable if at least the smallest size can still be made.
     const minMult = p.variants.length ? Math.min(...p.variants.map((v) => v.recipe_multiplier)) : 1;
+    const smallest = p.variants.find((v) => v.recipe_multiplier === minMult);
+    // An add-on is sold out if the drink with that add-on (smallest size) can't be made from current stock.
+    const menuAddons: MenuAddon[] = addons.map((a) => {
+      const short = [...computeUsage({ ...p, recipe } as CatalogProduct, smallest, [a])].find(
+        ([ing, n]) => (stock.get(ing) ?? 0) + 1e-9 < n,
+      );
+      const soldOut = !a.available || !!short;
+      return {
+        id: a.id,
+        name: a.name,
+        price: a.price,
+        available: a.available,
+        sold_out: soldOut,
+        sold_out_reason: !a.available ? "Unavailable" : short ? `Out of ${ingName.get(short[0])}` : undefined,
+      };
+    });
     let reason: string | undefined;
     for (const r of recipe) {
       const need = r.scales ? r.qty * minMult : r.qty;
@@ -117,7 +144,7 @@ export async function getMenu(q: Queryable) {
         break;
       }
     }
-    return { ...p, sold_out: !p.available || !!reason, sold_out_reason: !p.available ? "Unavailable" : reason };
+    return { ...p, addons: menuAddons, sold_out: !p.available || !!reason, sold_out_reason: !p.available ? "Unavailable" : reason };
   });
   return { categories, products };
 }

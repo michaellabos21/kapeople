@@ -6,7 +6,7 @@ import { peso, timeAgo } from "@/lib/format";
 import type { OrderStatus } from "@/lib/config";
 import { OrderDetailModal, useOrderActions, type PosOrder } from "@/components/OrderDetail";
 import { PaymentModal } from "@/components/PaymentModal";
-import { ErrorNote, Spinner } from "@/components/ui";
+import { ErrorNote, LoadState } from "@/components/ui";
 
 type O = PosOrder & { payment_method: string };
 
@@ -22,8 +22,7 @@ export default function OrdersBoard() {
   const [open, setOpen] = useState<O | null>(null);
   const [payFor, setPayFor] = useState<O | null>(null);
   const act = useOrderActions(reload);
-  if (error) return <div className="p-4"><ErrorNote message={error} /></div>;
-  if (!data) return <Spinner />;
+  if (!data) return <LoadState error={error} onRetry={reload} />;
   const live = open ? data.orders.find((o) => o.id === open.id) ?? open : null;
 
   return (

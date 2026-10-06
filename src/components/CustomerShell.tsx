@@ -53,6 +53,24 @@ function Inner({ children }: { children: ReactNode }) {
   useEffect(() => {
     void refreshNotes();
   }, [refreshNotes]);
+  // The notifications page marks everything read; refresh the badge right away.
+  useEffect(() => {
+    const onRead = () => void refreshNotes();
+    window.addEventListener("kapeople:notifications-read", onRead);
+    return () => window.removeEventListener("kapeople:notifications-read", onRead);
+  }, [refreshNotes]);
+
+  const [online, setOnline] = useState(true);
+  useEffect(() => {
+    const up = () => setOnline(true);
+    const down = () => setOnline(false);
+    window.addEventListener("online", up);
+    window.addEventListener("offline", down);
+    return () => {
+      window.removeEventListener("online", up);
+      window.removeEventListener("offline", down);
+    };
+  }, []);
   useEvents((e) => {
     if (e.type === "notification") {
       void refreshNotes();
@@ -70,6 +88,11 @@ function Inner({ children }: { children: ReactNode }) {
           {unread > 0 && <span className="absolute right-0 top-0 grid h-4 min-w-4 place-items-center rounded-full bg-bad px-1 text-[10px] font-bold text-white">{unread}</span>}
         </Link>
       </header>
+      {!online && (
+        <div role="alert" className="bg-bad px-4 py-2 text-center text-sm font-semibold text-white">
+          You&apos;re offline. Orders and updates will resume when you reconnect.
+        </div>
+      )}
       <main className="px-5 py-5">{children}</main>
 
       {showCartBar && (

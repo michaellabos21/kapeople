@@ -5,17 +5,17 @@
   --color-paper: #fbf7f1;
   --color-card: #ffffff;
   --color-line: #eadfd0;
-  --color-muted: #85735f;
-  --color-brand: #a8591a;
-  --color-brand-dark: #874512;
+  --color-muted: #6f5f4d;
+  --color-brand: #9a4f15;
+  --color-brand-dark: #7a3f0f;
   --color-brand-soft: #f7e9d6;
-  --color-ok: #3b7a57;
+  --color-ok: #2b6444;
   --color-ok-soft: #e1f0e7;
-  --color-warn: #b57a0c;
+  --color-warn: #7d5208;
   --color-warn-soft: #fbf0d3;
-  --color-bad: #b2402f;
+  --color-bad: #a03a2a;
   --color-bad-soft: #f8e0db;
-  --color-info: #3a6ea5;
+  --color-info: #2f5f93;
   --color-info-soft: #e0ebf6;
   --font-display: ui-serif, "Iowan Old Style", "Palatino Linotype", Georgia, serif;
   --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
@@ -34,6 +34,23 @@ body {
 button,
 a {
   touch-action: manipulation;
+}
+/* Visible keyboard focus everywhere (inputs keep their own ring). */
+:focus-visible {
+  outline: 2px solid var(--color-brand);
+  outline-offset: 2px;
+}
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 button:not(:disabled) {
   cursor: pointer;

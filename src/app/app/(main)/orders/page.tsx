@@ -3,14 +3,14 @@ import Link from "next/link";
 import { api } from "@/lib/client/api";
 import { useLive } from "@/lib/client/live";
 import { dateTime, peso } from "@/lib/format";
-import { Spinner, StatusBadge } from "@/components/ui";
+import { LoadState, StatusBadge } from "@/components/ui";
 import type { OrderStatus } from "@/lib/config";
 
 interface O { id: number; order_number: number; status: OrderStatus; total: number; created_at: string; items: { name: string; qty: number }[] }
 
 export default function OrdersPage() {
-  const { data } = useLive(() => api<{ orders: O[] }>("/api/orders"));
-  if (!data) return <Spinner />;
+  const { data, error, reload } = useLive(() => api<{ orders: O[] }>("/api/orders"));
+  if (!data) return <LoadState error={error} onRetry={reload} />;
   return (
     <div className="space-y-4">
       <h1 className="font-display text-3xl font-bold">Orders</h1>

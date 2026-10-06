@@ -23,6 +23,18 @@ interface CartCtx {
   clear: () => void;
 }
 
+/** Same product + size + add-ons + note = same line (quantities merge). */
+export function lineKey(l: Omit<CartLine, "key">): string {
+  return [l.productId, l.variantId, l.addons.map((a) => a.id).sort().join("."), l.notes ?? ""].join("|");
+}
+
+export function mergeLine(lines: CartLine[], l: Omit<CartLine, "key">): CartLine[] {
+  const key = lineKey(l);
+  return lines.some((x) => x.key === key)
+    ? lines.map((x) => (x.key === key ? { ...x, qty: x.qty + l.qty } : x))
+    : [...lines, { ...l, key }];
+}
+
 const Ctx = createContext<CartCtx | null>(null);
 const KEY = "kapeople.cart.v1";
 
@@ -44,13 +56,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
     } catch {}
   }, [lines, ready]);
 
-  const add = useCallback((l: Omit<CartLine, "key">) => {
-    const key = [l.productId, l.variantId, l.addons.map((a) => a.id).sort().join("."), l.notes ?? ""].join("|");
-    setLines((cur) => {
-      const hit = cur.find((x) => x.key === key);
-      return hit ? cur.map((x) => (x.key === key ? { ...x, qty: x.qty + l.qty } : x)) : [...cur, { ...l, key }];
-    });
-  }, []);
+  const add = useCallback((l: Omit<CartLine, "key">) => setLines((cur) => mergeLine(cur, l)), []);
   const setQty = useCallback(
     (key: string, qty: number) => setLines((cur) => (qty <= 0 ? cur.filter((x) => x.key !== key) : cur.map((x) => (x.key === key ? { ...x, qty } : x)))),
     [],

@@ -110,6 +110,16 @@ export async function logout(q: Queryable, token: string | undefined) {
   if (token) await q.query("delete from sessions where token = $1", [token]);
 }
 
+export async function updateProfile(q: Queryable, userId: number, input: { name: string; phone?: string }) {
+  const name = input.name.trim();
+  if (!name) throw new AppError("Enter your name.");
+  const [u] = await q.query<User>(
+    `update users set name = $2, phone = $3 where id = $1 returning ${USER_COLS}`,
+    [userId, name, input.phone?.trim() || null],
+  );
+  return u;
+}
+
 export async function changeOwnPassword(q: Queryable, userId: number, current: string, next: string, keepToken?: string) {
   if (next.length < MIN_PASSWORD) throw new AppError(`Use at least ${MIN_PASSWORD} characters.`);
   const [row] = await q.query<Row>("select password_hash from users where id = $1", [userId]);

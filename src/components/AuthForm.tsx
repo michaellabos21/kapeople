@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/client/api";
+import { suggestEmail } from "@/lib/client/email";
 import { ErrorNote } from "./ui";
 
 export function AuthForm({ mode, demo }: { mode: "customer" | "staff"; demo?: string }) {
@@ -11,6 +12,9 @@ export function AuthForm({ mode, demo }: { mode: "customer" | "staff"; demo?: st
   const [error, setError] = useState<string | null>(null);
   // Until React has hydrated, a click would fall back to a native form submit.
   const [ready, setReady] = useState(false);
+  const [show, setShow] = useState(false);
+  const [email, setEmail] = useState("");
+  const suggestion = signup ? suggestEmail(email) : null;
   useEffect(() => setReady(true), []);
 
   async function submit(e: React.FormEvent<HTMLFormElement>) {
@@ -54,11 +58,21 @@ export function AuthForm({ mode, demo }: { mode: "customer" | "staff"; demo?: st
       )}
       <div>
         <label className="label" htmlFor="email">Email</label>
-        <input id="email" name="email" type="email" className="input" autoComplete="email" required />
+        <input id="email" name="email" type="email" className="input" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
+        {suggestion && (
+          <p className="mt-1 text-sm text-muted">
+            Did you mean{" "}
+            <button type="button" className="font-semibold text-brand underline" onClick={() => setEmail(suggestion)}>{suggestion}</button>?
+          </p>
+        )}
       </div>
       <div>
         <label className="label" htmlFor="password">Password</label>
-        <input id="password" name="password" type="password" className="input" autoComplete={signup ? "new-password" : "current-password"} minLength={signup ? 8 : undefined} required />
+        <div className="relative">
+          <input id="password" name="password" type={show ? "text" : "password"} className="input !pr-16" autoComplete={signup ? "new-password" : "current-password"} minLength={signup ? 8 : undefined} required />
+          <button type="button" aria-pressed={show} onClick={() => setShow(!show)} className="absolute inset-y-0 right-2 px-2 text-xs font-semibold text-muted">{show ? "Hide" : "Show"}</button>
+        </div>
+        {signup && <p className="mt-1 text-xs text-muted">At least 8 characters.</p>}
       </div>
       <ErrorNote message={error} />
       <button className="btn-primary w-full" disabled={busy || !ready}>

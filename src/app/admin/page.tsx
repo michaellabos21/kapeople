@@ -52,6 +52,7 @@ function MenuManager() {
                     className="input !w-24 !py-1"
                     defaultValue={p.base_price}
                     inputMode="decimal"
+                    onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
                     onBlur={(e) => {
                       const v = Number(e.target.value);
                       if (!Number.isNaN(v) && v !== p.base_price) void patch(p.id, { basePrice: v });

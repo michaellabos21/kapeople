@@ -1,10 +1,10 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { api } from "@/lib/client/api";
 import { useLive } from "@/lib/client/live";
 import { dateTime, peso } from "@/lib/format";
 import { OrderDetailModal, type PosOrder } from "@/components/OrderDetail";
-import { Spinner, StatusBadge } from "@/components/ui";
+import { LoadState, StatusBadge } from "@/components/ui";
 
 const FILTERS = [
   { label: "All", value: "" },
@@ -17,11 +17,16 @@ const FILTERS = [
 export default function HistoryPage() {
   const [filter, setFilter] = useState("");
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(t);
+  }, [search]);
   const [open, setOpen] = useState<PosOrder | null>(null);
   const qs = new URLSearchParams({ limit: "100" });
   if (filter) qs.set("status", filter);
-  if (search.trim()) qs.set("q", search.trim());
-  const { data, reload } = useLive(() => api<{ orders: PosOrder[] }>(`/api/orders?${qs}`), ["orders"], 15000, qs.toString());
+  if (debouncedSearch.trim()) qs.set("q", debouncedSearch.trim());
+  const { data, error, reload } = useLive(() => api<{ orders: PosOrder[] }>(`/api/orders?${qs}`), ["orders"], 15000, qs.toString());
 
   return (
     <div className="mx-auto flex h-full max-w-5xl flex-col gap-3 p-4">
@@ -31,7 +36,7 @@ export default function HistoryPage() {
         ))}
         <input className="input !w-56 !py-1.5" placeholder="Order # or customer" value={search} onChange={(e) => setSearch(e.target.value)} />
       </div>
-      {!data ? <Spinner /> : (
+      {!data ? <LoadState error={error} onRetry={reload} /> : (
         <div className="min-h-0 flex-1 overflow-auto rounded-2xl border border-line bg-card">
           <table className="w-full text-sm">
             <thead className="sticky top-0 bg-card text-left text-xs uppercase tracking-wide text-muted">

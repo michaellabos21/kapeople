@@ -1,10 +1,10 @@
 "use client";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/client/api";
 import { useCart } from "@/lib/client/cart";
-import { Spinner, useToast } from "@/components/ui";
+import { LoadState, useToast } from "@/components/ui";
 import { ProductConfigurator } from "@/components/ProductConfigurator";
 import type { MenuProduct } from "@/lib/services/catalog";
 
@@ -14,18 +14,23 @@ export default function ProductPage() {
   const cart = useCart();
   const toast = useToast();
   const [product, setProduct] = useState<MenuProduct | null | undefined>(undefined);
+  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    api<{ products: MenuProduct[] }>("/api/menu").then((m) => setProduct(m.products.find((p) => p.id === Number(id)) ?? null));
+  const load = useCallback(() => {
+    setError(null);
+    api<{ products: MenuProduct[] }>("/api/menu")
+      .then((m) => setProduct(m.products.find((p) => p.id === Number(id)) ?? null))
+      .catch((e: Error) => setError(e.message));
   }, [id]);
+  useEffect(load, [load]);
 
-  if (product === undefined) return <Spinner />;
+  if (product === undefined) return <LoadState error={error} onRetry={load} />;
   if (!product) return <p className="py-10 text-center text-muted">We couldn&apos;t find that item. <Link href="/app/menu" className="font-semibold text-brand">Back to menu</Link></p>;
 
   return (
     <div className="space-y-5">
       <Link href="/app/menu" className="text-sm font-semibold text-muted">← Menu</Link>
-      <div className="grid place-items-center rounded-3xl bg-brand-soft py-10 text-7xl">{product.emoji}</div>
+      <div className="grid place-items-center rounded-3xl bg-brand-soft py-10 text-7xl" aria-hidden="true">{product.emoji}</div>
       <div>
         <h1 className="font-display text-3xl font-bold">{product.name}</h1>
         <p className="mt-1 text-muted">{product.description}</p>

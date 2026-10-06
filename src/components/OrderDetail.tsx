@@ -5,7 +5,7 @@ import { dateTime, peso } from "@/lib/format";
 import { ACTIVE_STATUSES, type OrderStatus, type PaymentMethod } from "@/lib/config";
 import { PaymentModal } from "./PaymentModal";
 import { PrintButton, Receipt, type ReceiptOrder } from "./Receipt";
-import { ErrorNote, Modal, StatusBadge, useToast } from "./ui";
+import { ErrorNote, Modal, StatusBadge, useDialog, useToast } from "./ui";
 
 export type PosOrder = ReceiptOrder & {
   id: number;
@@ -59,6 +59,7 @@ export function OrderDetailModal({ order, onClose, onChanged }: { order: PosOrde
     onChanged();
     onClose();
   });
+  const dialog = useDialog();
   const [payOpen, setPayOpen] = useState(false);
   const [restock, setRestock] = useState(false);
   if (!order) return null;
@@ -99,8 +100,14 @@ export function OrderDetailModal({ order, onClose, onChanged }: { order: PosOrde
               <button
                 className="btn-secondary w-full text-bad"
                 disabled={act.busy}
-                onClick={() => {
-                  const reason = prompt("Reason for cancelling? (optional)");
+                onClick={async () => {
+                  const reason = await dialog.ask({
+                    title: `Cancel order #${o.order_number}?`,
+                    message: o.payment_status === "paid" ? "The payment will be marked as refunded." : undefined,
+                    confirmLabel: "Cancel order",
+                    danger: true,
+                    input: { label: "Reason (optional, shown to the customer)", placeholder: "Out of stock, customer request…" },
+                  });
                   if (reason !== null) act.cancel(o, reason);
                 }}
               >
@@ -116,7 +123,15 @@ export function OrderDetailModal({ order, onClose, onChanged }: { order: PosOrde
                 <button
                   className="btn-danger w-full"
                   disabled={act.busy}
-                  onClick={() => confirm(`Refund ${peso(o.total)} for order #${o.order_number}?`) && act.refund(o, restock)}
+                  onClick={async () => {
+                    const ok = await dialog.confirm({
+                      title: `Refund ${peso(o.total)}?`,
+                      message: `Order #${o.order_number} will be marked refunded and any points earned will be taken back.${restock ? " Ingredients will be returned to stock." : ""}`,
+                      confirmLabel: "Refund order",
+                      danger: true,
+                    });
+                    if (ok) act.refund(o, restock);
+                  }}
                 >
                   Refund order
                 </button>

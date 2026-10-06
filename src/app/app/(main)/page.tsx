@@ -3,7 +3,7 @@ import Link from "next/link";
 import { api } from "@/lib/client/api";
 import { useLive } from "@/lib/client/live";
 import { peso } from "@/lib/format";
-import { StatusBadge, Spinner } from "@/components/ui";
+import { StatusBadge, LoadState } from "@/components/ui";
 import type { MenuProduct } from "@/lib/services/catalog";
 import type { OrderStatus } from "@/lib/config";
 
@@ -16,7 +16,7 @@ interface Promo { id: number; code: string; title: string; description: string }
 interface OrderLite { id: number; order_number: number; status: OrderStatus; total: number; items: { name: string; qty: number }[] }
 
 export default function HomePage() {
-  const { data } = useLive(async () => {
+  const { data, error, reload } = useLive(async () => {
     const [me, loyalty, promos, menu, orders] = await Promise.all([
       api<{ user: { name: string } }>("/api/auth/me"),
       api<Loyalty>("/api/loyalty"),
@@ -26,7 +26,7 @@ export default function HomePage() {
     ]);
     return { me: me.user, loyalty, promos: promos.promotions, menu: menu.products, active: orders.orders };
   });
-  if (!data) return <Spinner />;
+  if (!data) return <LoadState error={error} onRetry={reload} />;
   const { me, loyalty, promos, menu, active } = data;
   const target = loyalty.next_reward?.points_cost ?? loyalty.rewards[0]?.points_cost ?? 100;
   const canRedeem = loyalty.rewards.some((r) => loyalty.balance >= r.points_cost);
@@ -86,13 +86,13 @@ export default function HomePage() {
 
       <section>
         <div className="mb-2 flex items-center justify-between">
-          <h2 className="font-semibold">Popular right now</h2>
+          <h2 className="font-semibold">From the menu</h2>
           <Link href="/app/menu" className="text-sm font-semibold text-brand">See menu</Link>
         </div>
         <div className="grid grid-cols-2 gap-3">
           {menu.filter((p) => !p.sold_out).slice(0, 4).map((p) => (
             <Link key={p.id} href={`/app/product/${p.id}`} className="card p-4">
-              <div className="text-3xl">{p.emoji}</div>
+              <div className="text-3xl" aria-hidden="true">{p.emoji}</div>
               <p className="mt-2 text-sm font-semibold leading-tight">{p.name}</p>
               <p className="text-sm text-muted">from {peso(p.base_price)}</p>
             </Link>

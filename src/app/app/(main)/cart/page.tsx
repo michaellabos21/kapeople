@@ -31,8 +31,9 @@ export default function CartPage() {
   const attempt = useRef<string>(crypto.randomUUID()); // one key per checkout attempt → no double orders
 
   useEffect(() => {
-    api<{ promotions: Promo[] }>("/api/promotions").then((r) => setPromos(r.promotions));
-    api<Loyalty>("/api/loyalty").then(setLoyalty);
+    // Promos and points only add extras to the preview; checkout works without them.
+    api<{ promotions: Promo[] }>("/api/promotions").then((r) => setPromos(r.promotions)).catch(() => {});
+    api<Loyalty>("/api/loyalty").then(setLoyalty).catch(() => {});
   }, []);
 
   const reward = loyalty?.rewards.find((r) => loyalty.balance >= r.points_cost);
@@ -82,7 +83,7 @@ export default function CartPage() {
       <ul className="space-y-3">
         {cart.lines.map((l) => (
           <li key={l.key} className="card flex items-start gap-3 p-3.5">
-            <div className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-brand-soft text-2xl">{l.emoji}</div>
+            <div className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-brand-soft text-2xl" aria-hidden="true">{l.emoji}</div>
             <div className="min-w-0 flex-1">
               <p className="font-semibold leading-tight">{l.name}{l.variantName ? ` · ${l.variantName}` : ""}</p>
               {l.addons.length > 0 && <p className="text-xs text-muted">{l.addons.map((a) => a.name).join(", ")}</p>}

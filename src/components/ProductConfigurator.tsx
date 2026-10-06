@@ -23,7 +23,7 @@ export function ProductConfigurator({
   const [notes, setNotes] = useState("");
 
   const variant = product.variants.find((v) => v.id === variantId);
-  const addons = product.addons.filter((a) => addonIds.includes(a.id));
+  const addons = product.addons.filter((a) => addonIds.includes(a.id) && !a.sold_out);
   const unit = product.base_price + (variant?.price_delta ?? 0) + addons.reduce((s, a) => s + a.price, 0);
 
   return (
@@ -55,17 +55,18 @@ export function ProductConfigurator({
             {product.addons.filter((a) => a.available).map((a) => {
               const on = addonIds.includes(a.id);
               return (
-                <label key={a.id} className={`flex items-center justify-between rounded-xl border px-3.5 py-2.5 text-sm ${on ? "border-brand bg-brand-soft" : "border-line bg-card"}`}>
+                <label key={a.id} className={`flex items-center justify-between rounded-xl border px-3.5 py-2.5 text-sm ${a.sold_out ? "border-line bg-card opacity-70" : on ? "border-brand bg-brand-soft" : "border-line bg-card"}`}>
                   <span className="flex items-center gap-2.5">
                     <input
                       type="checkbox"
-                      checked={on}
+                      disabled={a.sold_out}
+                      checked={on && !a.sold_out}
                       onChange={() => setAddonIds((c) => (on ? c.filter((x) => x !== a.id) : [...c, a.id]))}
                       className="h-4 w-4 accent-[var(--color-brand)]"
                     />
                     {a.name}
                   </span>
-                  <span className="text-muted">+{peso(a.price)}</span>
+                  <span className={a.sold_out ? "font-semibold text-bad" : "text-muted"}>{a.sold_out ? a.sold_out_reason ?? "Sold out" : `+${peso(a.price)}`}</span>
                 </label>
               );
             })}

@@ -5,7 +5,7 @@ import { useState } from "react";
 import { api } from "@/lib/client/api";
 import { useLive } from "@/lib/client/live";
 import { Receipt, PrintButton, type ReceiptOrder } from "@/components/Receipt";
-import { ErrorNote, Spinner, StatusBadge } from "@/components/ui";
+import { ErrorNote, LoadState, StatusBadge, useDialog } from "@/components/ui";
 import { ORDER_FLOW, STATUS_LABEL } from "@/lib/config";
 
 const BLURB: Record<string, string> = {
@@ -21,16 +21,16 @@ const BLURB: Record<string, string> = {
 export default function OrderPage() {
   const { id } = useParams<{ id: string }>();
   const { data, error, reload } = useLive(() => api<{ order: ReceiptOrder & { id: number; cancel_reason: string | null; payment_status: string; reward_discount: number } }>(`/api/orders/${id}`));
+  const dialog = useDialog();
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-  if (error) return <ErrorNote message={error} />;
-  if (!data) return <Spinner />;
+  if (!data) return <LoadState error={error} onRetry={reload} />;
   const o = data.order;
   const step = ORDER_FLOW.indexOf(o.status as (typeof ORDER_FLOW)[number]);
   const closed = o.status === "cancelled" || o.status === "refunded";
 
   async function cancel() {
-    if (!confirm("Cancel this order?")) return;
+    if (!(await dialog.confirm({ title: "Cancel this order?", message: "The store hasn't started on it yet. If you paid online, it will be refunded.", confirmLabel: "Cancel order", danger: true }))) return;
     setBusy(true);
     setErr(null);
     try {

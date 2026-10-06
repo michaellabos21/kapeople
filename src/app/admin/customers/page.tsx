@@ -4,7 +4,7 @@ import { api } from "@/lib/client/api";
 import { useLive } from "@/lib/client/live";
 import { dateTime, peso } from "@/lib/format";
 import { CustomerDetailModal } from "@/components/CustomerDetail";
-import { Spinner, ToastProvider } from "@/components/ui";
+import { LoadState, ToastProvider } from "@/components/ui";
 
 interface Row { id: number; name: string; email: string; phone: string | null; points_balance: number; active: boolean; created_at: string; orders: number; spent: number; last_order: string | null }
 
@@ -43,7 +43,7 @@ function Inner() {
 
   const qs = new URLSearchParams({ sort, page: String(page), size: String(SIZE) });
   if (debounced.trim()) qs.set("q", debounced.trim());
-  const { data, reload } = useLive(() => api<{ customers: Row[]; total: number }>(`/api/admin/customers?${qs}`), [], 60000, qs.toString());
+  const { data, error, reload } = useLive(() => api<{ customers: Row[]; total: number }>(`/api/admin/customers?${qs}`), [], 60000, qs.toString());
   const pages = data ? Math.max(1, Math.ceil(data.total / SIZE)) : 1;
 
   return (
@@ -63,7 +63,7 @@ function Inner() {
         </select>
       </div>
 
-      {!data ? <Spinner /> : (
+      {!data ? <LoadState error={error} onRetry={reload} /> : (
         <div className="card overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="text-left text-xs uppercase tracking-wide text-muted">

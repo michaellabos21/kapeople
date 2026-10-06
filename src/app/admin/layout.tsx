@@ -5,6 +5,10 @@ import { SignOutButton } from "@/components/SignOutButton";
 import { AdminHeaderActions } from "@/components/AdminHeaderActions";
 import { AdminNav } from "@/components/AdminNav";
 
+import type { Metadata } from "next";
+
+export const metadata: Metadata = { title: "Admin · Kapeople", robots: { index: false, follow: false } };
+
 export const dynamic = "force-dynamic";
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {

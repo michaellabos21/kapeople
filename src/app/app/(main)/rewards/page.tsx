@@ -3,7 +3,7 @@ import Link from "next/link";
 import { api } from "@/lib/client/api";
 import { useLive } from "@/lib/client/live";
 import { dateTime, peso } from "@/lib/format";
-import { Spinner } from "@/components/ui";
+import { LoadState } from "@/components/ui";
 import { PESOS_PER_POINT } from "@/lib/config";
 
 interface Loyalty {
@@ -13,8 +13,8 @@ interface Loyalty {
 }
 
 export default function RewardsPage() {
-  const { data } = useLive(() => api<Loyalty>("/api/loyalty"));
-  if (!data) return <Spinner />;
+  const { data, error, reload } = useLive(() => api<Loyalty>("/api/loyalty"));
+  if (!data) return <LoadState error={error} onRetry={reload} />;
   const r = data.rewards[0];
   const ready = r && data.balance >= r.points_cost;
   return (

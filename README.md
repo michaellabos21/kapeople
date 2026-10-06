@@ -51,6 +51,14 @@ payment breakdown, best sellers, low stock), offline banner.
 
 **Security** — passwords are scrypt-hashed; sign-in locks for 15 minutes after 5 failed attempts per email (an admin password reset lifts it); deactivated accounts are signed out immediately; versioned migrations in `db/migrations/` upgrade existing databases on start (each runs once; nothing pending = one read-only query). Sign-ups are limited to 10/hour and failed logins to 20 per 15 minutes per IP; unknown-email and wrong-password logins take the same time.
 
+## Front-end quality
+
+Pages that fail to load show an error with **Try again** (not an endless spinner); an expired session sends you
+to the right sign-in page; dialogs are keyboard-accessible (focus trap, Escape, scroll lock, focus restored) and
+replace the browser's `confirm()`/`prompt()`; colours meet WCAG AA contrast (4.5:1); keyboard focus is visible;
+touch targets are 44px; each page has its own tab title; POS/admin are `noindex`. Out-of-stock add-ons are
+disabled, and the public menu no longer exposes recipe quantities.
+
 ## Business rules
 
 - **Prices are computed on the server** from the database; the client's totals are display-only.
@@ -71,7 +79,7 @@ payment breakdown, best sellers, low stock), offline banner.
 ## Tests
 
 ```bash
-npm test          # 47 tests against a real in-memory Postgres
+npm test          # 54 tests against a real in-memory Postgres
 npm run typecheck
 ```
 

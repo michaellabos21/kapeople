@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { api } from "@/lib/client/api";
 import { useLive } from "@/lib/client/live";
 import { dateTime, qty } from "@/lib/format";
-import { ErrorNote, Modal, Spinner, useToast } from "@/components/ui";
+import { ErrorNote, LoadState, Modal, useToast } from "@/components/ui";
 
 interface Ing { id: number; name: string; unit: string; current_qty: number; reserved_qty: number; available_qty: number; low_stock_threshold: number; low: boolean }
 interface Move { id: number; ingredient_name: string; unit: string; type: string; qty_change: number; balance_after: number; note: string | null; user_name: string | null; created_at: string }
@@ -18,7 +18,7 @@ const KIND: Record<Kind, { label: string; field: string; hint: string }> = {
 
 export default function InventoryPage() {
   const toast = useToast();
-  const { data, reload } = useLive(async () => {
+  const { data, error, reload } = useLive(async () => {
     const [i, m, me] = await Promise.all([
       api<{ ingredients: Ing[] }>("/api/inventory"),
       api<{ movements: Move[] }>("/api/inventory/movements"),
@@ -29,7 +29,7 @@ export default function InventoryPage() {
   const [action, setAction] = useState<{ ing: Ing; kind: Kind } | null>(null);
   const [adding, setAdding] = useState(false);
   const [view, setView] = useState<"stock" | "log">("stock");
-  if (!data) return <Spinner />;
+  if (!data) return <LoadState error={error} onRetry={reload} />;
 
   return (
     <div className="mx-auto flex h-full max-w-5xl flex-col gap-3 p-4">

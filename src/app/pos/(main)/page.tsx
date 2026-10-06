@@ -2,21 +2,21 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "@/lib/client/api";
 import { useLive } from "@/lib/client/live";
-import type { CartLine } from "@/lib/client/cart";
+import { mergeLine, type CartLine } from "@/lib/client/cart";
 import { peso } from "@/lib/format";
 import type { MenuProduct } from "@/lib/services/catalog";
 import type { PaymentMethod } from "@/lib/config";
 import { ProductConfigurator } from "@/components/ProductConfigurator";
 import { PaymentModal } from "@/components/PaymentModal";
 import { PrintButton, Receipt, type ReceiptOrder } from "@/components/Receipt";
-import { ErrorNote, Modal, Spinner, Stepper, useToast } from "@/components/ui";
+import { ErrorNote, LoadState, Modal, Stepper, useToast } from "@/components/ui";
 
 interface Customer { id: number; name: string; email: string; phone: string | null; points_balance: number }
 type Line = CartLine & { key: string };
 
 export default function SalesPage() {
   const toast = useToast();
-  const { data: menu, reload } = useLive(() => api<{ categories: { id: number; name: string }[]; products: MenuProduct[] }>("/api/menu"), ["inventory", "orders"], 30000);
+  const { data: menu, error: menuError, reload } = useLive(() => api<{ categories: { id: number; name: string }[]; products: MenuProduct[] }>("/api/menu"), ["inventory", "orders"], 30000);
   const [cat, setCat] = useState<number | null>(null);
   const [lines, setLines] = useState<Line[]>([]);
   const [config, setConfig] = useState<MenuProduct | null>(null);
@@ -37,13 +37,7 @@ export default function SalesPage() {
   const rew = useReward && canReward ? Math.min(50, subtotal - disc) : 0;
   const total = Math.max(0, subtotal - disc - rew);
 
-  function addLine(l: Omit<CartLine, "key">) {
-    const key = [l.productId, l.variantId, l.addons.map((a) => a.id).sort().join("."), l.notes ?? ""].join("|");
-    setLines((cur) => {
-      const hit = cur.find((x) => x.key === key);
-      return hit ? cur.map((x) => (x.key === key ? { ...x, qty: x.qty + l.qty } : x)) : [...cur, { ...l, key }];
-    });
-  }
+  const addLine = (l: Omit<CartLine, "key">) => setLines((cur) => mergeLine(cur, l));
   function tap(p: MenuProduct) {
     if (p.sold_out) return toast(`${p.name}: ${p.sold_out_reason ?? "sold out"}`, "bad");
     if (p.variants.length || p.addons.length) setConfig(p);
@@ -78,7 +72,7 @@ export default function SalesPage() {
     setBusy(false);
   }
 
-  if (!menu) return <Spinner />;
+  if (!menu) return <LoadState error={menuError} onRetry={reload} />;
   const shown = menu.products.filter((p) => cat === null || p.category_id === cat);
 
   return (
@@ -94,7 +88,7 @@ export default function SalesPage() {
         <div className="grid flex-1 auto-rows-min grid-cols-2 gap-3 overflow-y-auto p-4 sm:grid-cols-3 xl:grid-cols-4">
           {shown.map((p) => (
             <button key={p.id} onClick={() => tap(p)} className={`card flex flex-col items-start p-4 text-left transition active:scale-[0.98] ${p.sold_out ? "opacity-50" : "hover:border-brand"}`}>
-              <span className="text-3xl">{p.emoji}</span>
+              <span className="text-3xl" aria-hidden="true">{p.emoji}</span>
               <span className="mt-2 text-sm font-bold leading-tight">{p.name}</span>
               <span className="mt-1 text-sm text-muted">{p.sold_out ? <span className="font-semibold text-bad">{p.sold_out_reason}</span> : `${p.variants.length ? "from " : ""}${peso(p.base_price)}`}</span>
             </button>
