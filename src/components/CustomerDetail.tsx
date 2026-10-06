@@ -7,7 +7,7 @@ import type { OrderStatus } from "@/lib/config";
 import { ErrorNote, LoadState, Modal, StatusBadge, useDialog, useToast } from "./ui";
 
 interface Detail {
-  customer: { id: number; name: string; email: string; phone: string | null; points_balance: number; active: boolean; staff_notes: string | null; created_at: string };
+  customer: { not_activated: boolean; id: number; name: string; email: string; phone: string | null; points_balance: number; active: boolean; staff_notes: string | null; created_at: string };
   stats: { orders: number; spent: number; cancelled: number; refunded: number; last_order: string | null };
   orders: { id: number; order_number: number; status: OrderStatus; total: number; payment_method: string; source: string; created_at: string }[];
   loyalty: { id: number; type: string; points: number; balance_after: number; note: string; created_at: string }[];
@@ -56,6 +56,7 @@ export function CustomerDetailModal({ id, onClose, onChanged }: { id: number; on
             <div>
               <p>{c.email}{c.phone ? ` · ${c.phone}` : ""}</p>
               <p className="text-muted">Joined {new Date(c.created_at).toLocaleDateString("en-PH", { dateStyle: "medium" })}</p>
+              {c.not_activated && <p className="mt-1 rounded-lg bg-warn-soft px-2 py-1 text-xs font-semibold text-warn">Not activated yet — they can claim this account by signing up with this email and mobile number.</p>}
             </div>
             <button className={c.active ? "btn-secondary text-bad" : "btn-primary"} disabled={busy}
               onClick={async () => {

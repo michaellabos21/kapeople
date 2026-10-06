@@ -25,7 +25,12 @@ export async function hashPassword(pw: string): Promise<string> {
   return `${salt.toString("hex")}:${key.toString("hex")}`;
 }
 
+/** Marks an imported account that has no password yet (can't sign in until claimed). */
+export const NO_PASSWORD = "!unclaimed";
+const hasNoPassword = (hash: string) => hash.startsWith("!");
+
 async function verifyPassword(pw: string, stored: string): Promise<boolean> {
+  if (!stored.includes(":")) return false; // passwordless/imported accounts never match
   const [saltHex, keyHex] = stored.split(":");
   const key = await scrypt(pw, Buffer.from(saltHex, "hex"), 32);
   const expected = Buffer.from(keyHex, "hex");
@@ -41,6 +46,12 @@ async function createSession(q: Queryable, userId: number): Promise<string> {
   return token;
 }
 
+/** Philippine numbers appear as 0917…, +63917… or 63917…: compare the last 10 digits. */
+export function samePhone(a?: string | null, b?: string | null): boolean {
+  const tail = (s?: string | null) => (s ?? "").replace(/\D/g, "").slice(-10);
+  return tail(a).length === 10 && tail(a) === tail(b);
+}
+
 export async function signup(
   q: Queryable,
   input: { name: string; email: string; password: string; phone?: string },
@@ -49,8 +60,28 @@ export async function signup(
   await assertUnderLimit(q, "signup", ip, 10, 60, "Too many sign-ups from this network. Please try again later.");
   await recordEvent(q, "signup", ip); // count attempts, not just successes, so existing-email probing is throttled too
   const email = input.email.trim().toLowerCase();
-  const [dupe] = await q.query("select 1 from users where email = $1", [email]);
-  if (dupe) throw new AppError("An account with this email already exists.", 409);
+  const [dupe] = await q.query<Row>("select id, role, phone, password_hash from users where email = $1", [email]);
+  if (dupe) {
+    // Customers imported from a sign-up sheet have no password yet: let them claim the account with the
+    // same email AND the same mobile number they gave when they signed up.
+    if (dupe.role === "customer" && hasNoPassword(dupe.password_hash)) {
+      if (!samePhone(dupe.phone, input.phone)) {
+        throw new AppError(
+          "This email is already on our sign-up list. Enter the same mobile number you signed up with to activate your account.",
+          409,
+          "claim_phone",
+        );
+      }
+      const [claimed] = await q.query<User>(
+        `update users set password_hash = $2, name = $3 where id = $1 and password_hash like '!%'
+         returning ${USER_COLS}`,
+        [dupe.id, await hashPassword(input.password), input.name.trim()],
+      );
+      if (!claimed) throw new AppError("An account with this email already exists.", 409);
+      return { user: claimed, token: await createSession(q, claimed.id) };
+    }
+    throw new AppError("An account with this email already exists.", 409);
+  }
   const hash = await hashPassword(input.password);
   const [user] = await q.query<User>(
     `insert into users (role, name, email, phone, password_hash) values ('customer', $1, $2, $3, $4)

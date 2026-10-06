@@ -51,6 +51,13 @@ payment breakdown, best sellers, low stock), offline banner.
 
 **Security** — passwords are scrypt-hashed; sign-in locks for 15 minutes after 5 failed attempts per email (an admin password reset lifts it); deactivated accounts are signed out immediately; versioned migrations in `db/migrations/` upgrade existing databases on start (each runs once; nothing pending = one read-only query). Sign-ups are limited to 10/hour and failed logins to 20 per 15 minutes per IP; unknown-email and wrong-password logins take the same time.
 
+## Importing customers
+
+`scripts/import-customers.ts` loads a tab-separated sign-up sheet (timestamp, name, email, phone, social handle,
+consent, id). It does a dry run unless you pass `--apply`, never touches an email that already exists, and lists rows
+it can't import (no/invalid email). Imported customers have no password: they activate their account by signing up with
+the **same email and mobile number** (shown as "NOT ACTIVATED" in the admin). Keep the data file out of git.
+
 ## Front-end quality
 
 Pages that fail to load show an error with **Try again** (not an endless spinner); an expired session sends you
@@ -87,7 +94,7 @@ the installed app, other browsers, or twice. To preview it anywhere, open `/app/
 ## Tests
 
 ```bash
-npm test          # 63 tests against a real in-memory Postgres
+npm test          # 70 tests against a real in-memory Postgres
 npm run typecheck
 ```
 

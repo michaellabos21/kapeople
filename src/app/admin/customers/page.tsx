@@ -6,7 +6,7 @@ import { dateTime, peso } from "@/lib/format";
 import { CustomerDetailModal } from "@/components/CustomerDetail";
 import { LoadState, ToastProvider } from "@/components/ui";
 
-interface Row { id: number; name: string; email: string; phone: string | null; points_balance: number; active: boolean; created_at: string; orders: number; spent: number; last_order: string | null }
+interface Row { not_activated: boolean; id: number; name: string; email: string; phone: string | null; points_balance: number; active: boolean; created_at: string; orders: number; spent: number; last_order: string | null }
 
 const SORTS = [
   { v: "recent", l: "Newest" },
@@ -73,7 +73,7 @@ function Inner() {
               {data.customers.map((c) => (
                 <tr key={c.id} onClick={() => setOpen(c.id)} className={`cursor-pointer hover:bg-brand-soft/50 ${c.active ? "" : "opacity-60"}`}>
                   <td className="px-4 py-3">
-                    <p className="font-semibold">{c.name}{!c.active && <span className="ml-2 rounded bg-bad-soft px-1.5 py-0.5 text-[10px] font-bold text-bad">BLOCKED</span>}</p>
+                    <p className="font-semibold">{c.name}{!c.active && <span className="ml-2 rounded bg-bad-soft px-1.5 py-0.5 text-[10px] font-bold text-bad">BLOCKED</span>}{c.not_activated && <span className="ml-2 rounded bg-warn-soft px-1.5 py-0.5 text-[10px] font-bold text-warn">NOT ACTIVATED</span>}</p>
                     <p className="text-xs text-muted">{c.email}</p>
                   </td>
                   <td>{c.phone ?? "—"}</td>

@@ -1,5 +1,6 @@
 import type { Queryable, Row } from "../db";
 import { AppError } from "../errors";
+import { NO_PASSWORD } from "./auth";
 
 export type CustomerSort = "recent" | "spent" | "orders" | "points" | "name" | "last_order";
 
@@ -41,6 +42,7 @@ export async function listCustomers(
   const [rows, [{ total }]] = await Promise.all([
     q.query(
       `select u.id, u.name, u.email, u.phone, u.points_balance, u.active, u.created_at,
+              (u.password_hash like '!%') as not_activated,
               coalesce(o.orders, 0) as orders, coalesce(o.spent, 0) as spent, o.last_order
        ${BASE}${where} order by ${ORDER_BY[f.sort ?? "recent"]} limit ${limit} offset ${offset}`,
       params,
@@ -52,7 +54,8 @@ export async function listCustomers(
 
 export async function getCustomer(q: Queryable, id: number) {
   const [customer] = await q.query<Row>(
-    `select id, name, email, phone, points_balance, active, staff_notes, created_at
+    `select id, name, email, phone, points_balance, active, staff_notes, created_at,
+            (password_hash like '!%') as not_activated
        from users where id = $1 and role = 'customer'`,
     [id],
   );
@@ -132,4 +135,98 @@ export async function customersCsv(q: Queryable): Promise<string> {
     );
   }
   return lines.join("\r\n") + "\r\n";
+}
+
+// ---- import from a sign-up sheet ----
+
+export interface SheetRow {
+  signedUpAt: Date;
+  name: string;
+  email: string;
+  phone: string;
+  handle: string;
+  consent: string;
+  sheetId: string;
+}
+export interface SkippedRow {
+  line: number;
+  name: string;
+  reason: string;
+}
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+
+/** "9/19/2026 21:04:42" (M/D/YYYY, store local time = Philippines, UTC+8) → Date. */
+export function parseSheetDate(s: string): Date | null {
+  const m = s.trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4}) (\d{1,2}):(\d{2}):(\d{2})$/);
+  if (!m) return null;
+  const [, mo, d, y, h, mi, se] = m;
+  const iso = `${y}-${mo.padStart(2, "0")}-${d.padStart(2, "0")}T${h.padStart(2, "0")}:${mi}:${se}+08:00`;
+  const date = new Date(iso);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+/** Tab-separated: timestamp, name, email, phone, social handle, consent, sheet id. */
+export function parseSignupSheet(text: string): { rows: SheetRow[]; skipped: SkippedRow[] } {
+  const rows: SheetRow[] = [];
+  const skipped: SkippedRow[] = [];
+  const seen = new Set<string>();
+  text.split(/\r?\n/).forEach((raw, i) => {
+    if (!raw.trim()) return;
+    const c = raw.split("\t").map((x) => x.trim());
+    const name = c[1] ?? "";
+    const email = (c[2] ?? "").toLowerCase();
+    const at = parseSheetDate(c[0] ?? "");
+    const skip = (reason: string) => skipped.push({ line: i + 1, name: name || "(no name)", reason });
+    if (!name) return skip("no name");
+    if (!email) return skip("no email address");
+    if (!EMAIL_RE.test(email)) return skip(`invalid email "${email}"`);
+    if (!at) return skip(`unreadable date "${c[0]}"`);
+    if (seen.has(email)) return skip("duplicate email in the sheet");
+    seen.add(email);
+    rows.push({
+      signedUpAt: at,
+      name: name.replace(/\s+/g, " "),
+      email,
+      phone: c[3] ?? "",
+      handle: /^(n\/?a|none|-)?$/i.test(c[4] ?? "") ? "" : c[4],
+      consent: c[5] ?? "",
+      sheetId: c[6] ?? "",
+    });
+  });
+  return { rows, skipped };
+}
+
+const noteFor = (r: SheetRow) =>
+  [
+    `Imported from sign-up sheet${r.sheetId ? ` (row ${r.sheetId})` : ""}, signed up ${r.signedUpAt.toISOString().slice(0, 16).replace("T", " ")} UTC.`,
+    `Consent: ${r.consent || "not recorded"}.`,
+    r.handle ? `Social: ${r.handle}.` : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+/**
+ * Creates customer accounts without a password (they claim them by signing up with the same email + mobile).
+ * Existing emails are left untouched. `apply: false` only reports what would happen.
+ */
+export async function importCustomers(q: Queryable, rows: SheetRow[], opts: { apply: boolean }) {
+  const created: string[] = [];
+  const existing: string[] = [];
+  for (const r of rows) {
+    const [dupe] = await q.query("select 1 from users where email = $1", [r.email]);
+    if (dupe) {
+      existing.push(r.email);
+      continue;
+    }
+    if (opts.apply) {
+      await q.query(
+        `insert into users (role, name, email, phone, password_hash, staff_notes, created_at)
+         values ('customer', $1, $2, $3, $4, $5, $6)`,
+        [r.name, r.email, r.phone || null, NO_PASSWORD, noteFor(r), r.signedUpAt.toISOString()],
+      );
+    }
+    created.push(r.email);
+  }
+  return { created, existing };
 }
