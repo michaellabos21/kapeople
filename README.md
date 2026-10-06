@@ -1,1 +1,107 @@
-# lokly
+# Kapeople — POS + Customer App MVP
+
+One backend, three front ends. A customer orders on their phone → the POS receives it → staff process it →
+inventory is deducted → the customer earns points and sees live status.
+
+```
+Customer app (/app)   POS (/pos)   Admin (/admin)
+        └──────────────┼──────────────┘
+              Next.js route handlers  (src/app/api)
+                       │
+              Service layer (src/lib/services)  ← all business rules live here
+                       │
+                  PostgreSQL  (db/schema.sql)
+```
+
+## Run it
+
+```bash
+npm install
+npm run dev -- -p 3100
+```
+
+The first request creates a local embedded PostgreSQL database in `.data/` ([PGlite](https://pglite.dev)),
+applies `db/schema.sql` and seeds the menu, recipes, stock and demo accounts. No Docker or external services needed.
+Reset it with `npm run db:reset`.
+
+| Open | Who | Sign in |
+| --- | --- | --- |
+| http://localhost:3100/app | Customer | `valerie@example.test` (starts with 80 points) or sign up |
+| http://localhost:3100/pos | Staff (barista) | `staff@kapeople.test` |
+| http://localhost:3100/admin | Admin | `admin@kapeople.test` |
+
+Demo password for all seeded accounts: `kapeople123` (local development only — see `src/lib/seed.ts`).
+
+Tip: cookies are per host, so you can stay signed in as a customer on `localhost:3100` and as staff on
+`127.0.0.1:3100` in two tabs and watch an order travel between them.
+
+## What's built (maps to the plan)
+
+**Customer app** — sign up / login, home, menu, product page with size + add-ons + notes, cart, checkout
+(promo code, reward redemption, pay now or at pickup), live order tracking, order history, digital receipt,
+points balance + history, in-app notifications, browser notifications when permitted.
+
+**POS** — sales screen (customize, discount, attach customer for points, cash/GCash/card, change calculation,
+receipt, "hand over now"), order board (New → Accepted → Preparing → Ready → Completed) with a chime on new app
+orders, collect-payment-on-pickup, cancel, refund, transaction history, ingredient inventory (stock-in, stock-out,
+waste, recount, low-stock flags, movement log), reports (today / week / month: sales, orders, average order,
+payment breakdown, best sellers, low stock), offline banner.
+
+**Admin** — everything in Reports plus customer and loyalty stats, and menu on/off + price editing.
+
+## Business rules
+
+- **Prices are computed on the server** from the database; the client's totals are display-only.
+- **Loyalty:** ₱10 spent = 1 point, awarded when an order is *completed*, on the amount actually paid.
+  100 points = ₱50 off. Redeemed points are deducted at order time and returned if the order is cancelled or
+  refunded. A refund reverses earned points. Every change is a row in `loyalty_transactions` (audit trail).
+- **Inventory:** each product has a recipe (per Grande; sizes scale it; cups don't scale; oat milk *replaces* fresh
+  milk). Ingredients are deducted when an order is **completed**. Open orders *reserve* stock so the same milk can't
+  be sold twice, and products whose ingredients run out show as sold out and are rejected at checkout.
+- **Payments:** POS records cash (with change), GCash and card. In the customer app, GCash/card are **simulated**
+  (a `SIMULATED-…` reference, no real charge) and cash is paid at pickup. An unpaid order can't be completed.
+- **Duplicates:** checkout sends an idempotency key, so double-taps and retries create one order.
+- **Order numbers** are gapless, starting at #1001.
+- Cancelling: customers can cancel while the order is still *New*; staff can cancel any open order.
+  Paid orders get a refund record. Refunding a completed order optionally returns ingredients to stock.
+
+## Tests
+
+```bash
+npm test          # 17 scenario tests against a real in-memory Postgres
+npm run typecheck
+```
+
+Covers the Week-8 list from the plan: cash purchase, online order, cancelled order, refund, out-of-stock item,
+duplicate / concurrent submission, incorrect payment, loyalty calculation, inventory deductions, order status
+synchronisation.
+
+## Deliberate differences from the plan, and what's not done
+
+- **Stack:** the plan suggests Flutter + Supabase + Firebase. This build is a TypeScript/Next.js web app (the customer
+  app is a mobile-first web app, the POS is tablet-first) on plain PostgreSQL, because it can be run and tested
+  end-to-end without extra tooling. The schema and SQL are standard Postgres, and `src/lib/db.ts` has a node-postgres adapter that is used when
+  `DATABASE_URL` is set (it creates the schema and seed on first start). **That hosted-Postgres/Supabase path has not been
+  run yet** — everything above was verified on the embedded PGlite database only.
+  Moving the UI to Flutter later means reusing the same HTTP API.
+- **Auth** is a simple email/password + session-cookie implementation, not Supabase Auth. No password reset,
+  email verification or login rate limiting yet.
+- **Push notifications:** in-app notifications and browser notifications work; Firebase Cloud Messaging is not
+  wired up. `src/lib/services/notifications.ts` is the single place to add it.
+- **Real payments (GCash / Maya / cards)** are deferred, as the plan says.
+- **Realtime** uses server-sent events from a single Node process, with polling as a fallback. A multi-instance
+  deployment needs a shared channel (Postgres `LISTEN/NOTIFY` or Supabase Realtime) in `src/lib/bus.ts`.
+- **POS offline mode:** the POS shows a connection-lost banner but doesn't queue sales offline yet.
+- Single branch only; the schema has `branches` for later. Delivery, gift cards, tiers, recommendations: not built.
+- Product/add-on/recipe editing is limited to price and on/off in the admin; the rest is changed via `db/seed.sql`.
+
+## Layout
+
+```
+db/schema.sql, db/seed.sql        schema + demo catalogue
+src/lib/services/                 orders, inventory, loyalty, reports, catalog, auth, notifications
+src/lib/db.ts                     PGlite (default) or node-postgres (DATABASE_URL)
+src/app/api/                      HTTP API
+src/app/app/                      customer app      src/app/pos/   POS      src/app/admin/   admin
+tests/flow.test.ts                scenario tests
+```
