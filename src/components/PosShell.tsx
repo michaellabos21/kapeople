@@ -5,6 +5,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { api } from "@/lib/client/api";
 import { useLive } from "@/lib/client/live";
 import { ToastProvider, useToast } from "./ui";
+import { ChangePasswordButton } from "./ChangePasswordModal";
 
 const TABS = [
   { href: "/pos", label: "Sales" },
@@ -82,6 +83,7 @@ function Inner({ name, role, children }: { name: string; role: string; children:
           </span>
           {role === "admin" && <Link href="/admin" className="font-semibold text-brand">Admin</Link>}
           <span className="text-muted">{name}</span>
+          <ChangePasswordButton />
           <button
             className="font-semibold text-muted hover:text-ink"
             onClick={async () => {

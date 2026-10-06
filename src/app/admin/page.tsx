@@ -3,15 +3,18 @@ import { api } from "@/lib/client/api";
 import { useLive } from "@/lib/client/live";
 import { peso } from "@/lib/format";
 import { ReportView } from "@/components/ReportView";
+import { StaffManager } from "@/components/StaffManager";
 import { ToastProvider, useToast } from "@/components/ui";
 import type { MenuProduct } from "@/lib/services/catalog";
 
 export default function AdminPage() {
+  const { data: me } = useLive(() => api<{ user: { email: string } }>("/api/auth/me"), [], 600000);
   return (
     <ToastProvider>
       <h1 className="font-display mb-4 text-3xl font-bold">Dashboard</h1>
       <ReportView extended />
       <MenuManager />
+      {me && <StaffManager myEmail={me.user.email} />}
     </ToastProvider>
   );
 }

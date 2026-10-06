@@ -117,6 +117,16 @@ export async function createDb(opts: { memory?: boolean } = {}): Promise<Db> {
     await seedFresh(db, (sql) => db.exec(sql));
   }
 
+  // Idempotent upgrades for databases created by an earlier version.
+  if (hosted) {
+    await db.tx(async (q) => {
+      await q.query("select pg_advisory_xact_lock(7000)");
+      await q.query(readSql("migrate.sql"));
+    });
+  } else {
+    await db.exec(readSql("migrate.sql"));
+  }
+
   const { ensureAdminFromEnv } = await import("./seed");
   await ensureAdminFromEnv(db);
   return db;

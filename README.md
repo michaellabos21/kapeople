@@ -47,7 +47,9 @@ orders, collect-payment-on-pickup, cancel, refund, transaction history, ingredie
 waste, recount, low-stock flags, movement log), reports (today / week / month: sales, orders, average order,
 payment breakdown, best sellers, low stock), offline banner.
 
-**Admin** — everything in Reports plus customer and loyalty stats, and menu on/off + price editing.
+**Admin** — everything in Reports plus customer and loyalty stats, menu on/off + price editing, and **staff & admin account management** (add accounts, deactivate/reactivate, reset passwords with a one-time generated password). Everyone can change their own password.
+
+**Security** — passwords are scrypt-hashed; sign-in locks for 15 minutes after 5 failed attempts per email (an admin password reset lifts it); deactivated accounts are signed out immediately; `db/migrate.sql` upgrades existing databases on start.
 
 ## Business rules
 
@@ -68,7 +70,7 @@ payment breakdown, best sellers, low stock), offline banner.
 ## Tests
 
 ```bash
-npm test          # 21 tests against a real in-memory Postgres
+npm test          # 31 tests against a real in-memory Postgres
 npm run typecheck
 ```
 
@@ -104,8 +106,9 @@ until that is added.
   `DATABASE_URL` is set (it creates the schema and seed on first start). **That hosted-Postgres/Supabase path has not been
   run yet** — everything above was verified on the embedded PGlite database only.
   Moving the UI to Flutter later means reusing the same HTTP API.
-- **Auth** is a simple email/password + session-cookie implementation, not Supabase Auth. No password reset,
-  email verification or login rate limiting yet.
+- **Auth** is a simple email/password + session-cookie implementation, not Supabase Auth. There is no self-service
+  "forgot password" or email verification (staff resets go through an admin); lockouts are per email, so someone could
+  deliberately lock a known email out for 15 minutes.
 - **Push notifications:** in-app notifications and browser notifications work; Firebase Cloud Messaging is not
   wired up. `src/lib/services/notifications.ts` is the single place to add it.
 - **Real payments (GCash / Maya / cards)** are deferred, as the plan says.
