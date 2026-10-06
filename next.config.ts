@@ -5,6 +5,8 @@ const nextConfig: NextConfig = {
   // Lets you open the POS on 127.0.0.1 next to the customer app on localhost (separate cookie jars) in dev.
   allowedDevOrigins: ["127.0.0.1"],
   // PGlite (embedded Postgres) must stay a plain Node dependency, not bundled.
+  // db/*.sql is read at runtime to create the schema on first start, so make sure it ships with the server bundle.
+  outputFileTracingIncludes: { "/**": ["./db/**/*"] },
   serverExternalPackages: ["@electric-sql/pglite", "pg"],
 };
 

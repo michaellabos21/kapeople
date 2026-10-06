@@ -5,6 +5,9 @@ export const dynamic = "force-dynamic";
 
 /** Server-sent events: tells the UI when to refetch. Clients also poll as a fallback. */
 export const GET = route(ANY, async ({ req, user }) => {
+  // Serverless hosts can't hold the stream open or share the in-memory bus between instances.
+  // 204 tells EventSource to stop reconnecting; the UI falls back to polling.
+  if (process.env.DISABLE_SSE === "true") return new Response(null, { status: 204 });
   const enc = new TextEncoder();
   let cleanup = () => {};
   const stream = new ReadableStream({

@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { PGlite } from "@electric-sql/pglite";
+import type { PGlite } from "@electric-sql/pglite";
 import pg from "pg";
 
 export type Row = Record<string, any>;
@@ -18,8 +18,10 @@ const NUMERIC = 1700;
 const INT8 = 20;
 const toNum = (v: string) => Number(v);
 
-function pgliteDb(dataDir?: string): Db {
+async function pgliteDb(dataDir?: string): Promise<Db> {
   if (dataDir) fs.mkdirSync(path.dirname(dataDir), { recursive: true });
+  // Loaded lazily so hosted deployments (DATABASE_URL) never pay for the embedded engine.
+  const { PGlite } = await import("@electric-sql/pglite");
   const client = new PGlite(dataDir);
   const parsers = { [NUMERIC]: toNum, [INT8]: toNum };
   const wrap = (c: { query: PGlite["query"] }): Queryable => ({
@@ -41,7 +43,7 @@ function pgliteDb(dataDir?: string): Db {
 function postgresDb(url: string): Db {
   pg.types.setTypeParser(NUMERIC, toNum);
   pg.types.setTypeParser(INT8, toNum);
-  const pool = new pg.Pool({ connectionString: url, max: 5 });
+  const pool = new pg.Pool({ connectionString: url, max: Number(process.env.DB_POOL_MAX ?? 3) });
   return {
     async query<T>(sql: string, params: unknown[] = []) {
       return (await pool.query(sql, params as unknown[])).rows as T[];
@@ -74,22 +76,42 @@ function postgresDb(url: string): Db {
 const root = () => process.cwd();
 const readSql = (f: string) => fs.readFileSync(path.join(root(), "db", f), "utf8");
 
+/** Demo accounts have well-known passwords, so they are never created in production unless explicitly asked for. */
+const wantsDemoUsers = () => process.env.NODE_ENV !== "production" || process.env.SEED_DEMO_USERS === "true";
+
+async function seedFresh(q: Queryable, run: (sql: string) => Promise<unknown>) {
+  await run(readSql("schema.sql"));
+  await run(readSql("seed.sql"));
+  if (wantsDemoUsers()) {
+    const { seedDemoUsers } = await import("./seed");
+    await seedDemoUsers(q);
+  }
+}
+
 /** Creates a connection and applies schema + catalog seed when the database is empty. */
 export async function createDb(opts: { memory?: boolean } = {}): Promise<Db> {
   const url = process.env.DATABASE_URL;
-  const db = url && !opts.memory
+  const hosted = !!url && !opts.memory;
+  const db = hosted
     ? postgresDb(url)
-    : pgliteDb(opts.memory ? undefined : process.env.PGLITE_DIR ?? path.join(root(), ".data", "pglite"));
+    : await pgliteDb(opts.memory ? undefined : process.env.PGLITE_DIR ?? path.join(root(), ".data", "pglite"));
 
-  const [{ exists }] = await db.query<{ exists: boolean }>(
-    "select to_regclass('public.users') is not null as exists",
-  );
-  if (!exists) {
-    await db.exec(readSql("schema.sql"));
-    await db.exec(readSql("seed.sql"));
-    const { seedDemoUsers } = await import("./seed");
-    await seedDemoUsers(db);
+  const check = (q: Queryable) =>
+    q.query<{ exists: boolean }>("select to_regclass('public.users') is not null as exists");
+
+  if (hosted) {
+    // Several serverless instances can cold-start at once: serialise first-time setup.
+    await db.tx(async (q) => {
+      await q.query("select pg_advisory_xact_lock(7000)");
+      if ((await check(q))[0].exists) return;
+      await seedFresh(q, (sql) => q.query(sql));
+    });
+  } else if (!(await check(db))[0].exists) {
+    await seedFresh(db, (sql) => db.exec(sql));
   }
+
+  const { ensureAdminFromEnv } = await import("./seed");
+  await ensureAdminFromEnv(db);
   return db;
 }
 

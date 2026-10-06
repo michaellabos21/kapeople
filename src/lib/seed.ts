@@ -1,8 +1,8 @@
-import type { Db } from "./db";
+import type { Queryable } from "./db";
 import { hashPassword } from "./services/auth";
 
 /** Demo accounts for local development. Credentials are listed in README.md. */
-export async function seedDemoUsers(db: Db) {
+export async function seedDemoUsers(db: Queryable) {
   const pw = await hashPassword("kapeople123");
   const rows: [string, string, string, string | null][] = [
     ["admin", "Ana Admin", "admin@kapeople.test", null],
@@ -22,5 +22,22 @@ export async function seedDemoUsers(db: Db) {
   await db.query(
     "insert into loyalty_transactions (customer_id, type, points, balance_after, note) values ($1,'adjust',80,80,'Welcome bonus')",
     [id],
+  );
+}
+
+/**
+ * Production bootstrap: creates the first admin from ADMIN_EMAIL / ADMIN_PASSWORD (if both are set and
+ * no such user exists yet). The password is only read from the environment, never stored in the repo.
+ */
+export async function ensureAdminFromEnv(db: Queryable) {
+  const email = process.env.ADMIN_EMAIL?.trim().toLowerCase();
+  const password = process.env.ADMIN_PASSWORD;
+  if (!email || !password) return;
+  if (password.length < 12) throw new Error("ADMIN_PASSWORD must be at least 12 characters.");
+  const hash = await hashPassword(password);
+  await db.query(
+    `insert into users (role, name, email, password_hash, branch_id)
+     values ('admin', $1, $2, $3, 1) on conflict (email) do nothing`,
+    [process.env.ADMIN_NAME?.trim() || "Admin", email, hash],
   );
 }

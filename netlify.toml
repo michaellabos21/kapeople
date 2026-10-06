@@ -1,0 +1,12 @@
+[build]
+  command = "npm run build"
+
+[build.environment]
+  NODE_VERSION = "22"
+  # Netlify functions can't keep a stream open or share memory between instances; the UI polls instead.
+  DISABLE_SSE = "true"
+
+# Set in the Netlify UI (Site configuration → Environment variables), never in this file:
+#   DATABASE_URL    postgres connection string (Supabase: use the pooled connection string, SSL on)
+#   ADMIN_EMAIL     email for the first admin account
+#   ADMIN_PASSWORD  at least 12 characters

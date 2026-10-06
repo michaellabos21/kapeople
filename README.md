@@ -68,13 +68,33 @@ payment breakdown, best sellers, low stock), offline banner.
 ## Tests
 
 ```bash
-npm test          # 17 scenario tests against a real in-memory Postgres
+npm test          # 21 tests against a real in-memory Postgres
 npm run typecheck
 ```
 
 Covers the Week-8 list from the plan: cash purchase, online order, cancelled order, refund, out-of-stock item,
 duplicate / concurrent submission, incorrect payment, loyalty calculation, inventory deductions, order status
 synchronisation.
+
+## Deploy (Netlify + hosted Postgres)
+
+`netlify.toml` is included. Netlify has no persistent disk, so a hosted Postgres is required.
+
+1. Create a Postgres database (e.g. a Supabase project) and copy its **pooled** connection string.
+2. In Netlify: *Add new site → Import from Git*, pick this repo and branch.
+3. Under *Site configuration → Environment variables* set:
+   - `DATABASE_URL` — the connection string
+   - `ADMIN_EMAIL`, `ADMIN_PASSWORD` (12+ chars) — creates the first admin on first start
+   - optional `ADMIN_NAME`
+4. Deploy. On first start the app creates the schema and the demo menu in an empty database.
+
+In production the well-known demo accounts (`*@kapeople.test`) are **not** created (set `SEED_DEMO_USERS=true`
+only for a throwaway demo). Live updates fall back to polling (`DISABLE_SSE=true` in `netlify.toml`), so status
+changes show up within ~8–15 seconds instead of instantly.
+
+**Not yet verified:** the hosted-Postgres path and a real Netlify deploy have not been run. Anyone can sign up as a
+customer on a public deployment, and login has no rate limiting — put the site behind Netlify password protection
+until that is added.
 
 ## Deliberate differences from the plan, and what's not done
 
