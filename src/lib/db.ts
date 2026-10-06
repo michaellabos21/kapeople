@@ -92,6 +92,13 @@ async function seedFresh(q: Queryable, run: (sql: string) => Promise<unknown>) {
 export async function createDb(opts: { memory?: boolean } = {}): Promise<Db> {
   const url = process.env.DATABASE_URL;
   const hosted = !!url && !opts.memory;
+  // The embedded database lives on local disk. On a production host that means data is lost or split
+  // across instances, so refuse to start rather than silently falling back to it.
+  if (!hosted && !opts.memory && process.env.NODE_ENV === "production" && process.env.ALLOW_EMBEDDED_DB !== "true") {
+    throw new Error(
+      "DATABASE_URL is not set. Production needs a hosted Postgres (set DATABASE_URL), or set ALLOW_EMBEDDED_DB=true for a single-process self-hosted setup.",
+    );
+  }
   const db = hosted
     ? postgresDb(url)
     : await pgliteDb(opts.memory ? undefined : process.env.PGLITE_DIR ?? path.join(root(), ".data", "pglite"));

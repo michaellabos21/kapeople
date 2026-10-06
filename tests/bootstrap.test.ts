@@ -32,6 +32,12 @@ describe("production bootstrap", () => {
     await expect(login(db, "owner@example.test", "kapeople123")).rejects.toThrow(/Incorrect/);
   });
 
+  it("refuses to start in production without DATABASE_URL instead of using the embedded database", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("DATABASE_URL", "");
+    await expect(createDb()).rejects.toThrow(/DATABASE_URL is not set/);
+  });
+
   it("refuses a short ADMIN_PASSWORD", async () => {
     vi.stubEnv("NODE_ENV", "production");
     vi.stubEnv("ADMIN_EMAIL", "owner@example.test");

@@ -86,7 +86,7 @@ synchronisation.
    - `DATABASE_URL` — the connection string
    - `ADMIN_EMAIL`, `ADMIN_PASSWORD` (12+ chars) — creates the first admin on first start
    - optional `ADMIN_NAME`
-4. Deploy. On first start the app creates the schema and the demo menu in an empty database.
+4. Deploy. In production the app **refuses to start without `DATABASE_URL`** (it won't fall back to the embedded database). On first start the app creates the schema and the demo menu in an empty database.
 
 In production the well-known demo accounts (`*@kapeople.test`) are **not** created (set `SEED_DEMO_USERS=true`
 only for a throwaway demo). Live updates fall back to polling (`DISABLE_SSE=true` in `netlify.toml`), so status
